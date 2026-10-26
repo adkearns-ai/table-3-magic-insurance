@@ -10,6 +10,7 @@ const state = {
   currentView: 'command', // 'command' | 'analytics' | 'directory'
   activeChannelTab: 'email', // 'email' | 'sms' | 'advisor' | 'push'
   searchQuery: '',
+  theme: localStorage.getItem('aegis-theme') || 'light',
   riskFilter: 'ALL',
   agent: new RetailGrowthAgent({ retentionBias: 0.70 }),
   isSimModalOpen: false,
@@ -31,6 +32,8 @@ const state = {
 function renderApp() {
   const app = document.getElementById('app');
   if (!app) return;
+
+  document.documentElement.setAttribute('data-theme', state.theme);
 
   const selectedCustomer = state.customers.find(c => c.id === state.selectedCustomerId) || state.customers[0];
   const agentEval = state.agent.evaluateCustomer(selectedCustomer);
@@ -79,6 +82,9 @@ function renderApp() {
             <span class="metric-pill-label">Net ARR Lift</span>
             <span class="metric-pill-val">+$348.5K</span>
           </div>
+          <button class="theme-toggle-btn" id="btn-theme-toggle" title="Switch Theme (Light/Dark)">
+            <span>${state.theme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode'}</span>
+          </button>
           <button class="action-btn-primary" id="btn-open-simulator">
             <span>⚡</span> Simulate Life Event
           </button>
@@ -582,7 +588,7 @@ function renderDirectoryView() {
           </thead>
           <tbody>
             ${state.customers.map(c => `
-              <tr style="border-bottom:1px solid var(--border-subtle); transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+              <tr class="directory-table-row">
                 <td style="padding:0.85rem 1rem; display:flex; align-items:center; gap:0.6rem;">
                   <img src="${c.avatar}" style="width:32px; height:32px; border-radius:50%; object-fit:cover;" />
                   <div>
@@ -708,6 +714,14 @@ function attachEventListeners() {
         renderApp();
       }
     });
+  });
+
+  // Theme Toggle Button
+  document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
+    state.theme = state.theme === 'light' ? 'dark' : 'light';
+    localStorage.setItem('aegis-theme', state.theme);
+    document.documentElement.setAttribute('data-theme', state.theme);
+    renderApp();
   });
 
   // Simulator Modal Open/Close
