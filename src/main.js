@@ -1,15 +1,15 @@
 import './style.css';
 import { INITIAL_CUSTOMERS } from './data/customers.js';
-import { LIFE_EVENT_TYPES, INSURANCE_PRODUCTS } from './data/insuranceCatalog.js';
+import { LIFE_EVENT_TYPES } from './data/insuranceCatalog.js';
 import { RetailGrowthAgent } from './agent/growthEngine.js';
 
 // Application State
 const state = {
   customers: [...INITIAL_CUSTOMERS],
   selectedCustomerId: INITIAL_CUSTOMERS[0].id,
-  selectedProductId: null, // Selected eligible product for campaign dispatch
+  selectedProductId: null,
   currentView: 'command', // 'command' | 'analytics' | 'directory'
-  activeChannelTab: 'email', // 'email' | 'advisor' | 'push' (SMS removed per user request)
+  activeChannelTab: 'email', // 'email' | 'advisor' | 'push' (SMS removed)
   searchQuery: '',
   theme: localStorage.getItem('magic-theme') || localStorage.getItem('aegis-theme') || 'light',
   riskFilter: 'ALL',
@@ -28,7 +28,7 @@ const state = {
   ]
 };
 
-// Main DOM Render Function
+// Main DOM Render Function (Strictly Zero Emojis)
 function renderApp() {
   const app = document.getElementById('app');
   if (!app) return;
@@ -38,7 +38,6 @@ function renderApp() {
   const selectedCustomer = state.customers.find(c => c.id === state.selectedCustomerId) || state.customers[0];
   const agentEval = state.agent.evaluateCustomer(selectedCustomer);
 
-  // If selected product not set or no longer eligible, default to top recommended product
   const activeOfferProduct = state.selectedProductId 
     ? (agentEval.eligibleInsurances.find(p => p.id === state.selectedProductId) || agentEval.eligibleInsurances[0])
     : agentEval.eligibleInsurances[0];
@@ -48,8 +47,8 @@ function renderApp() {
     <header class="site-header">
       <div class="header-inner">
         <div class="brand-section">
-          <div class="brand-logo-container">
-            <img src="/agent-logo.jpg" alt="Magic Insurance Logo" class="brand-logo-img" />
+          <div class="brand-logo-container" title="Dubrovnik Castle Emblem">
+            <img src="/dubrovnik-castle-logo.jpg" alt="Dubrovnik Castle Emblem" class="brand-logo-img" />
           </div>
           <div class="brand-title-wrap">
             <h1>Magic Insurance</h1>
@@ -60,24 +59,24 @@ function renderApp() {
           </div>
         </div>
 
-        <!-- Navigation Tabs -->
+        <!-- Navigation Tabs (No Emojis) -->
         <nav class="nav-tabs" role="tablist">
           <button class="nav-tab-btn ${state.currentView === 'command' ? 'active' : ''}" id="nav-btn-command">
-            <span>🚀</span> Command Center
+            Command Center
           </button>
           <button class="nav-tab-btn ${state.currentView === 'analytics' ? 'active' : ''}" id="nav-btn-analytics">
-            <span>📊</span> Growth Analytics
+            Growth Analytics
           </button>
           <button class="nav-tab-btn ${state.currentView === 'directory' ? 'active' : ''}" id="nav-btn-directory">
-            <span>👥</span> Customer 360°
+            Customer 360°
           </button>
         </nav>
 
-        <!-- Live Telemetry Stats, Theme Toggle & Simulator Action -->
+        <!-- Live Telemetry: High-Likelihood Upsell Potential at the top -->
         <div class="telemetry-bar">
-          <div class="metric-pill">
-            <span class="metric-pill-label">Monitored Portfolio</span>
-            <span class="metric-pill-val">14,820</span>
+          <div class="metric-pill highlight-metric">
+            <span class="metric-pill-label">High-Likelihood Upsell</span>
+            <span class="metric-pill-val">$1.24M</span>
           </div>
           <div class="metric-pill success">
             <span class="metric-pill-label">Churn Defended</span>
@@ -88,10 +87,10 @@ function renderApp() {
             <span class="metric-pill-val">+$348.5K</span>
           </div>
           <button class="theme-toggle-btn" id="btn-theme-toggle" title="Switch Theme (Light/Dark)">
-            <span>${state.theme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode'}</span>
+            <span>${state.theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
           </button>
           <button class="action-btn-primary" id="btn-open-simulator">
-            <span>⚡</span> Simulate Life Event
+            Simulate Life Event
           </button>
         </div>
       </div>
@@ -104,24 +103,23 @@ function renderApp() {
       ${state.currentView === 'directory' ? renderDirectoryView() : ''}
     </main>
 
-    <!-- Simulator Modal -->
+    <!-- Simulator Modal (No Emojis) -->
     <div class="modal-overlay ${state.isSimModalOpen ? 'open' : ''}" id="simulator-modal">
       <div class="modal-window">
         <div class="modal-header">
-          <div class="modal-title">⚡ Interactive "What-If" Life Event Sandbox</div>
+          <div class="modal-title">Interactive Life Event Sandbox</div>
           <button class="modal-close-btn" id="btn-close-sim">&times;</button>
         </div>
         <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.15rem;">
-          Trigger a real-time life event signal for <strong>${selectedCustomer.name}</strong> to watch Magic Insurance recalculate active coverage, product eligibility, and adoption likelihood.
+          Trigger a life event signal for <strong>${selectedCustomer.name}</strong> to recalculate active coverage, product eligibility, and closing likelihood.
         </p>
 
         <div class="sim-events-grid">
           ${Object.values(LIFE_EVENT_TYPES).map(evt => `
             <div class="sim-event-card ${state.selectedSimEventType === evt.id ? 'selected' : ''}" data-event-id="${evt.id}">
-              <div class="sim-event-icon">${evt.icon}</div>
               <div class="sim-event-info">
                 <div class="sim-event-name">${evt.label}</div>
-                <div class="sim-event-urgency">Urgency: ${evt.urgency}</div>
+                <div class="sim-event-urgency">Urgency Level: ${evt.urgency}</div>
               </div>
             </div>
           `).join('')}
@@ -131,28 +129,28 @@ function renderApp() {
           type="text" 
           class="sim-custom-note" 
           id="sim-custom-input" 
-          placeholder="Optional: custom context (e.g., 'Closed on $750k home with pool in Austin suburbs')" 
+          placeholder="Optional: custom context (e.g., 'Closed on $750k home in Austin suburbs')" 
         />
 
         <div class="sim-actions-row">
           <button class="btn-secondary" id="btn-cancel-sim">Cancel</button>
           <button class="action-btn-primary" id="btn-run-simulation">
-            <span>⚡</span> Trigger Event & Re-evaluate
+            Trigger Event & Re-evaluate
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Notification Toast -->
+    <!-- Notification Toast (No Emojis) -->
     <div class="toast-notice" id="app-toast">
-      <span>✅</span> <span id="toast-text">Offer dispatched successfully!</span>
+      <span id="toast-text">Offer dispatched successfully</span>
     </div>
   `;
 
   attachEventListeners();
 }
 
-// Render Command Center (3-Column Layout with Simplified Highlighted Customer)
+// Render Command Center (No Emojis, No Children Details)
 function renderCommandCenter(customer, evaluation, activeOfferProduct) {
   const filteredCustomers = state.customers.filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(state.searchQuery.toLowerCase()) || 
@@ -161,10 +159,8 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
     return matchesSearch && matchesRisk;
   });
 
-  const nba = evaluation.nextBestAction;
   const currentPolicies = evaluation.currentInsurances || customer.activePolicies || [];
   const eligibleInsurances = evaluation.eligibleInsurances || [];
-  const offers = evaluation.omnichannelOffers;
 
   return `
     <div class="command-grid">
@@ -172,20 +168,19 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
       <section class="glass-panel" aria-label="Customer Portfolio">
         <div class="panel-header">
           <div class="panel-title-wrap">
-            <div class="panel-icon-badge">👥</div>
             <h2 class="panel-title">Monitored Accounts</h2>
           </div>
           <span class="badge-counter">${filteredCustomers.length} active</span>
         </div>
 
         <div class="customer-search-box">
-          <span class="search-icon-pos">🔍</span>
           <input 
             type="text" 
             class="customer-search-input" 
             id="cust-search" 
-            placeholder="Search customer, location..." 
+            placeholder="Search account, location..." 
             value="${state.searchQuery}" 
+            style="padding-left: 0.85rem;"
           />
         </div>
 
@@ -206,8 +201,7 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
               </div>
               <div class="cust-card-bottom">
                 <div class="cust-signal-summary">
-                  <span>${c.detectedSignals[0] ? LIFE_EVENT_TYPES[c.detectedSignals[0].type]?.icon || '⚡' : '🛡️'}</span>
-                  <span>${c.detectedSignals[0]?.title.slice(0, 24) || 'Stable Profile'}...</span>
+                  <span>${c.detectedSignals[0]?.title.slice(0, 28) || 'Stable Account'}...</span>
                 </div>
                 <span>$${c.totalAnnualPremium.toLocaleString()}/yr</span>
               </div>
@@ -215,53 +209,52 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
           `).join('')}
         </div>
 
-        <!-- Live Ingestion Stream -->
+        <!-- Live Ingestion Stream (No Emojis) -->
         <div class="signal-stream-section">
           <div class="stream-title-wrap">
-            <span class="stream-title">📡 Live Signal Detection Feed</span>
+            <span class="stream-title">Live Signal Detection Feed</span>
             <span class="pulse-dot"></span>
           </div>
           <div class="live-feed-item">
             <div class="feed-header">
-              <span class="feed-title">👶 Newborn Dependent Sync</span>
+              <span class="feed-title">New Dependent Registration Sync</span>
               <span class="feed-time">10m ago</span>
             </div>
-            <span class="feed-source">Austin Vital Stats & Health Registry</span>
+            <span class="feed-source">Vital Statistics & Health Registry</span>
           </div>
           <div class="live-feed-item">
             <div class="feed-header">
-              <span class="feed-title">🏡 Deed Recorded: $840k Dwelling</span>
+              <span class="feed-title">Deed Recorded: $840k Dwelling</span>
               <span class="feed-time">42m ago</span>
             </div>
-            <span class="feed-source">Denver County Clerk API</span>
+            <span class="feed-source">County Clerk Real Estate API</span>
           </div>
           <div class="live-feed-item">
             <div class="feed-header">
-              <span class="feed-title">⚠️ Rate Jump + Competitor Search</span>
+              <span class="feed-title">Rate Adjustment + Aggregator Search</span>
               <span class="feed-time">1h ago</span>
             </div>
-            <span class="feed-source">Fintech Competitor Click Tracker</span>
+            <span class="feed-source">Competitor Quote Activity Tracker</span>
           </div>
         </div>
       </section>
 
-      <!-- Column 2: Highlighted Person (Simplified & Clear: Current Insurances vs. Eligible Insurances with Likelihood) -->
-      <section class="glass-panel" aria-label="Customer Insurance Intelligence">
+      <!-- Column 2: Highlighted Customer Insurance Profile (Simple & Clear) -->
+      <section class="glass-panel column-coverage" aria-label="Customer Insurance Intelligence">
         <div class="panel-header">
           <div class="panel-title-wrap">
-            <div class="panel-icon-badge">📋</div>
             <h2 class="panel-title">Customer Insurance Profile</h2>
           </div>
-          <span class="badge-counter">${currentPolicies.length} Active • ${eligibleInsurances.length} Eligible</span>
+          <span class="badge-counter">${currentPolicies.length} Active Policies &bull; ${eligibleInsurances.length} Eligible</span>
         </div>
 
-        <!-- Highlighted Person Summary Banner -->
+        <!-- Highlighted Person Summary Banner (No Emojis, No Children Details) -->
         <div class="active-cust-banner">
           <div class="profile-main-wrap">
             <img src="${customer.avatar}" alt="${customer.name}" class="profile-main-avatar" />
             <div>
               <div class="profile-name">${customer.name}</div>
-              <div class="profile-subinfo">${customer.household} • ${customer.location}</div>
+              <div class="profile-subinfo">${customer.household} &bull; ${customer.location}</div>
             </div>
           </div>
           <div class="profile-metrics-group">
@@ -270,7 +263,7 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
               <div class="stat-number">${customer.tenureYears} yrs</div>
             </div>
             <div class="profile-stat">
-              <div class="stat-title">Total Premium</div>
+              <div class="stat-title">Active Premium</div>
               <div class="stat-number">$${customer.totalAnnualPremium.toLocaleString()}/yr</div>
             </div>
             <div class="profile-stat">
@@ -280,47 +273,41 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
           </div>
         </div>
 
-        <!-- Section 1: What Insurances The Person Has -->
+        <!-- Section 1: What Insurances They Have -->
         <div class="current-insurances-section">
           <div class="section-subheading">
-            <span>🛡️ Current Insurances (${currentPolicies.length} Active Policies)</span>
+            <span>Current Insurances (${currentPolicies.length} Active Policies)</span>
             <span style="font-weight:600; text-transform:none; font-family:var(--font-mono); color:var(--text-main);">
               Total: $${customer.totalAnnualPremium.toLocaleString()}/year
             </span>
           </div>
 
           <div class="current-policies-grid">
-            ${currentPolicies.map(p => {
-              const icon = p.type.toLowerCase().includes('auto') ? '🚗' : 
-                           p.type.toLowerCase().includes('renter') || p.type.toLowerCase().includes('home') ? '🏡' : 
-                           p.type.toLowerCase().includes('life') ? '👨‍👩‍👧' : '🛡️';
-              return `
-                <div class="current-policy-card">
-                  <div class="current-policy-top">
-                    <span class="current-policy-name">
-                      <span>${icon}</span>
-                      <span>${p.type}</span>
-                    </span>
-                    <span class="policy-status-pill">${p.status || 'Active'}</span>
-                  </div>
-                  <div class="current-policy-bottom">
-                    <span>Policy: <strong style="font-family:var(--font-mono);">${p.id}</strong></span>
-                    <span class="current-policy-premium">$${p.annualPremium.toLocaleString()}/yr</span>
-                  </div>
-                  <div style="font-size:0.7rem; color:var(--text-dim); display:flex; justify-content:space-between;">
-                    <span>Renewal Date:</span>
-                    <span style="font-family:var(--font-mono);">${p.renewalDate || '2027-01-15'}</span>
-                  </div>
+            ${currentPolicies.map(p => `
+              <div class="current-policy-card">
+                <div class="current-policy-top">
+                  <span class="current-policy-name">
+                    ${p.type}
+                  </span>
+                  <span class="policy-status-pill">${p.status || 'Active'}</span>
                 </div>
-              `;
-            }).join('')}
+                <div class="current-policy-bottom">
+                  <span>Policy ID: <strong style="font-family:var(--font-mono);">${p.id}</strong></span>
+                  <span class="current-policy-premium">$${p.annualPremium.toLocaleString()}/yr</span>
+                </div>
+                <div style="font-size:0.7rem; color:var(--text-dim); display:flex; justify-content:space-between;">
+                  <span>Renewal Date:</span>
+                  <span style="font-family:var(--font-mono);">${p.renewalDate || '2027-01-15'}</span>
+                </div>
+              </div>
+            `).join('')}
           </div>
         </div>
 
         <!-- Section 2: Which Insurances They're Eligible For & The Likelihood They Would Go For Them -->
         <div class="eligible-insurances-section">
           <div class="section-subheading">
-            <span>⭐ Eligible Insurances & Adoption Likelihood</span>
+            <span>Eligible Insurances & Closing Likelihood</span>
             <span style="font-weight:600; text-transform:none; color:var(--cyan-primary);">
               Ranked by Propensity
             </span>
@@ -335,10 +322,9 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
                   <div class="eligible-card-header">
                     <div>
                       <div class="eligible-prod-title">
-                        <span>${item.icon}</span>
                         <span>${item.name}</span>
                         <span class="eligible-category-tag">${item.category}</span>
-                        ${item.isTopRecommendation ? '<span class="policy-status-pill" style="background:#E0F2FE; color:#0369A1; border-color:#BAE6FD;">⭐ Top Recommendation</span>' : ''}
+                        ${item.isTopRecommendation ? '<span class="policy-status-pill" style="background:#E0F2FE; color:#0369A1; border-color:#BAE6FD;">Top Recommendation</span>' : ''}
                       </div>
                     </div>
                     <div class="likelihood-badge-pill ${tierClass}">
@@ -356,7 +342,7 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
                     </span>
                   </div>
 
-                  <!-- Why They're Eligible & Likelihood Driver -->
+                  <!-- Why they would go for it / Eligibility Reason -->
                   <div class="eligible-reason-box">
                     <strong>Why they would go for it:</strong> ${item.reason}
                   </div>
@@ -369,7 +355,7 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
                       <span class="eligible-savings-val">Save $${item.savings}/yr bundle discount</span>
                     </div>
                     <button class="btn-select-offer ${isSelected ? 'selected' : ''}" data-select-product="${item.id}">
-                      ${isSelected ? '✓ Selected for Outreach' : 'Select for Outreach'}
+                      ${isSelected ? 'Selected for Outreach' : 'Select for Outreach'}
                     </button>
                   </div>
                 </div>
@@ -379,38 +365,37 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
         </div>
       </section>
 
-      <!-- Column 3: Proactive Outreach (SMS Removed Per Request) -->
+      <!-- Column 3: Proactive Outreach (SMS Removed) -->
       <section class="glass-panel column-dispatch" aria-label="Omnichannel Dispatcher">
         <div class="panel-header">
           <div class="panel-title-wrap">
-            <div class="panel-icon-badge">✉️</div>
             <h2 class="panel-title">Proactive Outreach</h2>
           </div>
           <span class="badge-counter">${activeOfferProduct ? activeOfferProduct.name : 'Personalized'}</span>
         </div>
 
-        <!-- Channel Selector Tabs (SMS completely removed) -->
+        <!-- Channel Selector Tabs (No Emojis, No SMS) -->
         <div class="omni-channel-tabs" role="tablist">
           <button class="channel-tab-btn ${state.activeChannelTab === 'email' ? 'active' : ''}" data-channel="email">
-            <span>✉️</span> Email Campaign
+            Email Campaign
           </button>
           <button class="channel-tab-btn ${state.activeChannelTab === 'advisor' ? 'active' : ''}" data-channel="advisor">
-            <span>📞</span> Advisor Script
+            Advisor Script
           </button>
           <button class="channel-tab-btn ${state.activeChannelTab === 'push' ? 'active' : ''}" data-channel="push">
-            <span>📱</span> Mobile App
+            Mobile App
           </button>
         </div>
 
         <!-- Dynamic Outreach Preview -->
         <div class="channel-preview-card">
-          ${renderChannelPreview(state.activeChannelTab, customer, offers, activeOfferProduct || nba.recommendedProduct, nba)}
+          ${renderChannelPreview(state.activeChannelTab, customer, activeOfferProduct || evaluation.nextBestAction.recommendedProduct, evaluation.nextBestAction)}
         </div>
 
         <!-- Dispatch Call-to-Action -->
         <div class="dispatch-action-bar">
           <button class="dispatch-cta-btn" id="btn-dispatch-offer">
-            <span>🚀</span> Dispatch ${activeOfferProduct ? activeOfferProduct.name : 'Offer'} (1-Click)
+            Dispatch ${activeOfferProduct ? activeOfferProduct.name : 'Offer'} (1-Click)
           </button>
           <div class="dispatch-history-log">
             <span>Recent dispatch: <strong>${state.dispatchLog[0]?.product}</strong></span>
@@ -422,8 +407,8 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
   `;
 }
 
-// Render dynamic preview for Email / Advisor / Push (SMS removed)
-function renderChannelPreview(channel, customer, offers, product, nba) {
+// Render dynamic preview for Email / Advisor / Push (No Emojis)
+function renderChannelPreview(channel, customer, product, nba) {
   const firstName = customer.name.split(' ')[0];
   const prodName = product.name;
   const savings = product.savings || nba.estimatedSavingsForCustomer;
@@ -432,15 +417,15 @@ function renderChannelPreview(channel, customer, offers, product, nba) {
     return `
       <div class="email-meta-header">
         <div class="email-meta-row">To: <span>${customer.name} &lt;${customer.name.toLowerCase().replace(/[^a-z]/g, '.')}@email.com&gt;</span></div>
-        <div class="email-meta-row">From: <span>Magic Insurance Advisory &lt;advisor@magicinsurance.com&gt;</span></div>
+        <div class="email-meta-row">From: <span>Magic Insurance Advisory &lt;advisory@magicinsurance.com&gt;</span></div>
         <div class="email-subject-line">Subject: Pre-Approved ${prodName} Bundle Savings for ${firstName}</div>
       </div>
       <div class="email-body-text">
 Dear ${firstName},
 
-We reviewed your current insurance portfolio to ensure your household coverage matches your recent life milestones.
+We reviewed your active insurance portfolio to ensure your household coverage matches your recent life milestones.
 
-Based on your current policies and verified eligibility, you have been pre-approved for our <strong>${prodName}</strong> with an active multi-policy bundle discount.
+Based on your current policies and verified eligibility, you have been pre-approved for our ${prodName} with an active multi-policy bundle discount.
 
 Key Benefits of Your Tailored Coverage:
 • Immediate $${savings}/year bundled savings credited to your account
@@ -458,14 +443,14 @@ Review your personalized proposal below to lock in this preferred member rate.
   if (channel === 'advisor') {
     return `
       <div style="font-size:0.78rem; font-weight:700; color:var(--cyan-primary); margin-bottom:0.6rem;">
-        📞 Magic Insurance Advisor Live Call & Consultation Script
+        Magic Insurance Advisor Consultation Script
       </div>
       <div class="advisor-script-list">
         <div class="advisor-point-card">
           <strong>Warm Introduction:</strong> "Hello ${firstName}, this is your personal Magic Insurance advisor calling to follow up on your account coverage."
         </div>
         <div class="advisor-point-card">
-          <strong>Context & Eligibility:</strong> "I noticed your household is now eligible for <strong>${prodName}</strong>. Given your recent milestone, this fills an important safety net gap."
+          <strong>Context & Eligibility:</strong> "I noticed your household is now eligible for ${prodName}. Given your recent milestone, this fills an important safety net gap."
         </div>
         <div class="advisor-point-card">
           <strong>Value Proposition:</strong> "Because of your existing loyalty with us, bundling this will save you $${savings}/year directly off your annual bill."
@@ -481,12 +466,12 @@ Review your personalized proposal below to lock in this preferred member rate.
     return `
       <div style="background:var(--bg-card); border:1px solid var(--border-medium); border-radius:var(--radius-md); padding:1rem; margin-top:2rem; box-shadow:var(--shadow-sm);">
         <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
-          <img src="/agent-logo.jpg" style="width:24px; height:24px; border-radius:4px;" />
+          <img src="/dubrovnik-castle-logo.jpg" style="width:24px; height:24px; border-radius:4px;" />
           <span style="font-size:0.76rem; font-weight:700; color:var(--text-bright);">Magic Insurance Mobile Portal</span>
           <span style="font-size:0.68rem; color:var(--text-dim); margin-left:auto;">Now</span>
         </div>
         <div style="font-size:0.84rem; font-weight:700; color:var(--text-bright); margin-bottom:0.25rem;">
-          ✨ New Eligible Coverage: ${prodName}
+          New Eligible Coverage: ${prodName}
         </div>
         <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.75rem;">
           Tap to review your pre-approved proposal with $${savings}/yr multi-policy bundle savings.
@@ -499,7 +484,7 @@ Review your personalized proposal below to lock in this preferred member rate.
   }
 }
 
-// Render Growth & Retention Analytics View
+// Render Growth & Retention Analytics View (No Emojis)
 function renderAnalyticsView() {
   return `
     <div class="analytics-view-container">
@@ -507,22 +492,22 @@ function renderAnalyticsView() {
         <div class="kpi-card">
           <div class="kpi-title">Proactive Churn Defended</div>
           <div class="kpi-value">89.4%</div>
-          <div class="kpi-trend"><span>↑</span> +14.2% vs reactive retention desk</div>
+          <div class="kpi-trend">+14.2% vs reactive retention desk</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-title">Average Policy Cross-Sell ARR</div>
           <div class="kpi-value">+$1,420</div>
-          <div class="kpi-trend"><span>↑</span> 3.8x baseline industry conversion</div>
+          <div class="kpi-trend">3.8x baseline industry conversion</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-title">Life Event Detection Lead Time</div>
           <div class="kpi-value">4.2 Days</div>
-          <div class="kpi-trend"><span>⚡</span> 26 days ahead of policy renewal notice</div>
+          <div class="kpi-trend">26 days ahead of policy renewal notice</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-title">Customer Lifetime Value (LTV)</div>
           <div class="kpi-value">+31.5%</div>
-          <div class="kpi-trend"><span>↑</span> Multi-policy stickiness boost</div>
+          <div class="kpi-trend">Multi-policy stickiness boost</div>
         </div>
       </div>
 
@@ -535,35 +520,35 @@ function renderAnalyticsView() {
           <div class="bar-chart-list">
             <div class="bar-item">
               <div class="bar-label-row">
-                <span class="bar-label-name">🏡 Home Purchase (Homeowners + Umbrella)</span>
+                <span class="bar-label-name">Home Purchase (Homeowners + Umbrella)</span>
                 <span class="bar-label-val">76.4%</span>
               </div>
               <div class="bar-track"><div class="bar-fill" style="width: 76.4%;"></div></div>
             </div>
             <div class="bar-item">
               <div class="bar-label-row">
-                <span class="bar-label-name">👶 Welcomed Newborn (Term Life + Child Rider)</span>
+                <span class="bar-label-name">Welcomed Dependent (Term Life + Child Rider)</span>
                 <span class="bar-label-val">68.2%</span>
               </div>
               <div class="bar-track"><div class="bar-fill" style="width: 68.2%;"></div></div>
             </div>
             <div class="bar-item">
               <div class="bar-label-row">
-                <span class="bar-label-name">🚗 New Vehicle Delivery (Connected Auto)</span>
+                <span class="bar-label-name">New Vehicle Delivery (Connected Auto)</span>
                 <span class="bar-label-val">62.8%</span>
               </div>
               <div class="bar-track"><div class="bar-fill" style="width: 62.8%;"></div></div>
             </div>
             <div class="bar-item">
               <div class="bar-label-row">
-                <span class="bar-label-name">⚠️ Rate Shock Defense (Loyalty Rate Shield)</span>
+                <span class="bar-label-name">Rate Shock Defense (Loyalty Rate Shield)</span>
                 <span class="bar-label-val">84.1%</span>
               </div>
               <div class="bar-track"><div class="bar-fill emerald" style="width: 84.1%;"></div></div>
             </div>
             <div class="bar-item">
               <div class="bar-label-row">
-                <span class="bar-label-name">🎓 Teen Driver Milestones (Liability Shield)</span>
+                <span class="bar-label-name">Household Driver Milestones (Liability Shield)</span>
                 <span class="bar-label-val">59.5%</span>
               </div>
               <div class="bar-track"><div class="bar-fill" style="width: 59.5%;"></div></div>
@@ -578,13 +563,13 @@ function renderAnalyticsView() {
           </div>
           <div style="display:flex; flex-direction:column; gap:0.9rem; font-size:0.82rem; margin-top:0.5rem;">
             <div style="padding:0.75rem; background:rgba(244,63,94,0.08); border-left:3px solid var(--rose-danger); border-radius:var(--radius-sm);">
-              <div style="font-weight:700; color:var(--rose-danger); margin-bottom:0.2rem;">❌ Legacy Reactive Insurer Model</div>
+              <div style="font-weight:700; color:var(--rose-danger); margin-bottom:0.2rem;">Legacy Reactive Insurer Model</div>
               <div style="color:var(--text-muted);">
                 Waits for annual renewal notice or customer cancellation call. Churn rate averages 15-22% annually. Cross-selling relies on unsolicited blanket cold-calls with less than 3% conversion.
               </div>
             </div>
             <div style="padding:0.75rem; background:rgba(16,185,129,0.08); border-left:3px solid var(--emerald-success); border-radius:var(--radius-sm);">
-              <div style="font-weight:700; color:var(--emerald-success); margin-bottom:0.2rem;">✅ Magic Insurance Proactive Model</div>
+              <div style="font-weight:700; color:var(--emerald-success); margin-bottom:0.2rem;">Magic Insurance Proactive Model</div>
               <div style="color:var(--text-muted);">
                 Continuously correlates real-time life telemetry (county records, telematics, health additions, rate adjustments). Identifies coverage gaps and eligible products with adoption likelihood, dispatching tailored offers with 68%+ acceptance.
               </div>
@@ -596,7 +581,7 @@ function renderAnalyticsView() {
   `;
 }
 
-// Render Customer 360° Directory View
+// Render Customer 360° Directory View (No Emojis)
 function renderDirectoryView() {
   return `
     <div class="glass-panel" style="padding:1.5rem;">
@@ -680,7 +665,6 @@ function attachEventListeners() {
     searchInput.addEventListener('input', (e) => {
       state.searchQuery = e.target.value;
       renderApp();
-      // Restore cursor position
       const reSearch = document.getElementById('cust-search');
       if (reSearch) {
         reSearch.focus();
@@ -695,7 +679,7 @@ function attachEventListeners() {
       const custId = card.getAttribute('data-cust-id');
       if (custId) {
         state.selectedCustomerId = custId;
-        state.selectedProductId = null; // Reset offer product to top recommendation of new customer
+        state.selectedProductId = null;
         renderApp();
       }
     });
@@ -721,13 +705,13 @@ function attachEventListeners() {
       const prodId = btn.getAttribute('data-select-product');
       if (prodId) {
         state.selectedProductId = prodId;
-        showToast(`Selected ${prodId} for proactive outreach campaign!`);
+        showToast(`Selected ${prodId} for outreach campaign`);
         renderApp();
       }
     });
   });
 
-  // Channel Tabs (Email, Advisor, Mobile App Push - SMS removed)
+  // Channel Tabs (Email, Advisor, Mobile App Push)
   document.querySelectorAll('.channel-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const channel = btn.getAttribute('data-channel');
@@ -781,8 +765,8 @@ function attachEventListeners() {
         state.customers[idx] = simResult.updatedCustomer;
       }
       state.isSimModalOpen = false;
-      state.selectedProductId = null; // Re-evaluate top recommendation
-      showToast(`Life event simulation triggered! Updated eligibility & adoption likelihood.`);
+      state.selectedProductId = null;
+      showToast(`Life event simulation triggered: updated eligibility & closing likelihood`);
       renderApp();
     }
   });
@@ -809,7 +793,7 @@ function attachEventListeners() {
     currentCust.churnRiskScore = Math.max(12, Math.round(currentCust.churnRiskScore * 0.45));
     currentCust.churnRiskTier = currentCust.churnRiskScore > 70 ? 'CRITICAL' : currentCust.churnRiskScore > 40 ? 'MEDIUM' : 'LOW';
 
-    showToast(`Dispatched ${product ? product.name : 'Offer'} via ${state.activeChannelTab.toUpperCase()}! Customer accepted proposal.`);
+    showToast(`Dispatched ${product ? product.name : 'Offer'} via ${state.activeChannelTab.toUpperCase()}`);
     renderApp();
   });
 }

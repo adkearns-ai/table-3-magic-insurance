@@ -3,7 +3,7 @@ import { INSURANCE_PRODUCTS, LIFE_EVENT_TYPES } from '../data/insuranceCatalog.j
 export class RetailGrowthAgent {
   constructor(config = {}) {
     this.name = 'Magic Insurance Core';
-    this.retentionBias = config.retentionBias ?? 0.65; // Higher = prioritize churn defense over raw revenue
+    this.retentionBias = config.retentionBias ?? 0.65;
     this.crossSellThreshold = config.crossSellThreshold ?? 0.60;
     this.apiKey = config.apiKey || null;
   }
@@ -37,7 +37,7 @@ export class RetailGrowthAgent {
     const hasLife = existingPolicyTypes.some(t => t.includes('life'));
     const hasUmbrella = existingPolicyTypes.some(t => t.includes('umbrella') || t.includes('liability'));
 
-    if (!hasLife && (customer.age < 50 || customer.household.includes('Child') || customer.household.includes('Married'))) {
+    if (!hasLife && (customer.age < 50 || customer.household.includes('Dependent') || customer.household.includes('Married'))) {
       coverageGaps.push(INSURANCE_PRODUCTS.TERM_LIFE);
     }
     if (!hasHome && (primaryEvent?.id === 'HOME_PURCHASE' || customer.activePolicies.some(p => p.type.includes('Renters')))) {
@@ -46,14 +46,14 @@ export class RetailGrowthAgent {
     if (!hasUmbrella && (customer.estimatedLTV > 30000 || customer.household.includes('Teen') || customer.activePolicies.length >= 2)) {
       coverageGaps.push(INSURANCE_PRODUCTS.UMBRELLA_LIABILITY);
     }
-    if (customer.household.includes('Newborn') || customer.household.includes('1 Newborn') || customer.detectedSignals.some(s => s.type === 'NEW_CHILD')) {
+    if (customer.household.includes('Dependent') || customer.detectedSignals.some(s => s.type === 'NEW_CHILD')) {
       coverageGaps.push(INSURANCE_PRODUCTS.CHILD_EDUCATION_RIDER);
     }
     if (customer.age >= 55) {
       coverageGaps.push(INSURANCE_PRODUCTS.RETIREMENT_LONGEVITY_ANNUITY);
     }
 
-    // Step 3: Compute Next-Best-Action (NBA) Decision
+    // Step 3: Compute Next-Best-Action Decision
     let nextBestAction = null;
     let rationale = [];
 
@@ -94,7 +94,7 @@ export class RetailGrowthAgent {
     } else if (primaryEvent?.id === 'NEW_CHILD') {
       nextBestAction = {
         type: 'PROACTIVE_CROSS_SELL',
-        title: 'Newborn Protection & Family Growth Bundle',
+        title: 'Dependent Protection & Family Growth Bundle',
         recommendedProduct: INSURANCE_PRODUCTS.TERM_LIFE,
         secondaryProduct: INSURANCE_PRODUCTS.CHILD_EDUCATION_RIDER,
         bundleDiscountPercent: 15,
@@ -103,14 +103,14 @@ export class RetailGrowthAgent {
         projectedARRDelta: '+$1,220 Net New ARR',
         urgency: 'HIGH (Within 14 days)',
         confidence: 0.96,
-        headline: 'Secure Household Financial Security for Growing Family'
+        headline: 'Secure Household Financial Security for Your Family'
       };
 
       rationale = [
         {
           step: '1. Life Event Signal Correlation',
-          detail: 'Verified newborn registration flag. Household transitioned to dependent-care status with zero active life insurance policies on file.',
-          badge: 'Life Milestone: Baby',
+          detail: 'Verified dependent addition flag. Household transitioned to dependent-care status with zero active life insurance policies on file.',
+          badge: 'Life Milestone',
           badgeType: 'info'
         },
         {
@@ -194,7 +194,7 @@ export class RetailGrowthAgent {
     // Step 4: Compute Comprehensive Eligible Insurances & Likelihood Scores
     const eligibleInsurances = this.getEligibleInsurances(customer, primaryEvent, nextBestAction);
 
-    // Step 5: Synthesize Omnichannel Outreach Collateral (SMS removed)
+    // Step 5: Synthesize Omnichannel Outreach Collateral (No SMS)
     const omnichannelOffers = this.generateOmnichannelContent(customer, primaryEvent, nextBestAction);
 
     return {
@@ -210,8 +210,7 @@ export class RetailGrowthAgent {
   }
 
   /**
-   * Systematic Eligibility & Adoption Likelihood Engine
-   * Returns what insurances the customer is eligible for, why, and the probability of adoption
+   * Systematic Eligibility & Adoption Likelihood Engine (No Emojis, No Child Names/Ages)
    */
   getEligibleInsurances(customer, primaryEvent, nextBestAction) {
     const activeTypes = (customer.activePolicies || []).map(p => p.type.toLowerCase());
@@ -226,9 +225,9 @@ export class RetailGrowthAgent {
     if (!hasLife) {
       let likelihood = 55;
       let reason = 'Essential income safety net protecting family living expenses.';
-      if (eventId === 'NEW_CHILD' || customer.household.includes('Newborn') || customer.household.includes('Child')) {
+      if (eventId === 'NEW_CHILD' || customer.household.includes('Dependent')) {
         likelihood = 95;
-        reason = 'Triggered by newborn dependent Lucas: Household currently has $0 active life insurance protection.';
+        reason = 'Triggered by new dependent: Household currently has no active life insurance protection on file.';
       } else if (customer.household.includes('Married') || customer.age < 45) {
         likelihood = 78;
         reason = 'High propensity: Secure locked-in low premiums to protect mortgage obligations.';
@@ -243,7 +242,6 @@ export class RetailGrowthAgent {
         likelihood,
         likelihoodTier: likelihood >= 80 ? 'VERY HIGH' : likelihood >= 65 ? 'HIGH' : 'MODERATE',
         reason,
-        icon: '👨‍👩‍👧',
         isTopRecommendation: topProductId === 'TERM_LIFE'
       });
     }
@@ -252,7 +250,7 @@ export class RetailGrowthAgent {
     const hasHome = activeTypes.some(t => t.includes('home') || t.includes('dwelling') || t.includes('property'));
     if (!hasHome) {
       let likelihood = 48;
-      let reason = 'Comprehensive dwelling & premises replacement coverage.';
+      let reason = 'Comprehensive dwelling and premises replacement coverage.';
       if (eventId === 'HOME_PURCHASE' || signals.some(s => s.type === 'HOME_PURCHASE')) {
         likelihood = 97;
         reason = 'Triggered by new property deed recording: Replaces existing temporary renters policy with full home coverage.';
@@ -270,7 +268,6 @@ export class RetailGrowthAgent {
         likelihood,
         likelihoodTier: likelihood >= 80 ? 'VERY HIGH' : likelihood >= 65 ? 'HIGH' : 'MODERATE',
         reason,
-        icon: '🏡',
         isTopRecommendation: topProductId === 'HOMEOWNERS_PLUS'
       });
     }
@@ -285,7 +282,7 @@ export class RetailGrowthAgent {
         reason = 'Direct churn solution: Counteracts recent rate adjustment with 22% safe-driver cashback.';
       } else if (eventId === 'NEW_VEHICLE') {
         likelihood = 88;
-        reason = 'New vehicle purchase triggers dynamic EV / vehicle safe-driver replacement rider.';
+        reason = 'New vehicle purchase triggers dynamic EV and vehicle safe-driver replacement rider.';
       }
       list.push({
         id: 'CONNECTED_AUTO_BUNDLE',
@@ -297,7 +294,6 @@ export class RetailGrowthAgent {
         likelihood,
         likelihoodTier: likelihood >= 80 ? 'VERY HIGH' : likelihood >= 65 ? 'HIGH' : 'MODERATE',
         reason,
-        icon: '🚗',
         isTopRecommendation: topProductId === 'CONNECTED_AUTO_BUNDLE'
       });
     }
@@ -321,14 +317,13 @@ export class RetailGrowthAgent {
         likelihood,
         likelihoodTier: likelihood >= 80 ? 'VERY HIGH' : likelihood >= 65 ? 'HIGH' : 'MODERATE',
         reason,
-        icon: '🛡️',
         isTopRecommendation: topProductId === 'UMBRELLA_LIABILITY'
       });
     }
 
     // 5. Future Scholar Growth Rider
     const hasChildRider = activeTypes.some(t => t.includes('scholar') || t.includes('education'));
-    if (!hasChildRider && (customer.household.includes('Newborn') || customer.household.includes('Child') || eventId === 'NEW_CHILD')) {
+    if (!hasChildRider && (customer.household.includes('Dependent') || eventId === 'NEW_CHILD')) {
       const likelihood = 89;
       list.push({
         id: 'CHILD_EDUCATION_RIDER',
@@ -339,8 +334,7 @@ export class RetailGrowthAgent {
         savings: 81,
         likelihood,
         likelihoodTier: 'VERY HIGH',
-        reason: 'College tuition cash accumulation rider locking in guaranteed child insurability.',
-        icon: '🎓',
+        reason: 'Tax-advantaged education savings vehicle with guaranteed insurability for dependents.',
         isTopRecommendation: topProductId === 'CHILD_EDUCATION_RIDER'
       });
     }
@@ -359,8 +353,7 @@ export class RetailGrowthAgent {
         savings: 32,
         likelihood,
         likelihoodTier: likelihood >= 70 ? 'HIGH' : 'MODERATE',
-        reason: '24/7 dark web credit monitoring, ransomware reimbursement, and full family identity recovery.',
-        icon: '🔒',
+        reason: '24/7 dark web credit monitoring, ransomware reimbursement, and full household identity recovery.',
         isTopRecommendation: topProductId === 'CYBER_IDENTITY_SHIELD'
       });
     }
@@ -371,7 +364,7 @@ export class RetailGrowthAgent {
   }
 
   /**
-   * Generates tailored communications across channels (SMS removed per user request)
+   * Generates tailored communications across channels (No Emojis, No Child Names/Ages)
    */
   generateOmnichannelContent(customer, event, nba) {
     const firstName = customer.name.split(' ')[0];
@@ -387,33 +380,33 @@ export class RetailGrowthAgent {
       emailSubject = `Exclusive Loyalty Rate Protection for the ${customer.name.split('&')[0]} Family`;
       emailBody = `Dear ${firstName},
 
-As one of our valued clients of over ${customer.tenureYears} years, we’ve been reviewing your coverage. We know rising inflation and vehicle repair costs have impacted premiums across the country, and we want to ensure your rate remains shielded.
+As one of our valued clients of over ${customer.tenureYears} years, we have been reviewing your coverage. We know rising inflation and vehicle repair costs have impacted premiums across the country, and we want to ensure your rate remains shielded.
 
 We have pre-approved an exclusive ${discount}% Loyalty Rate-Shield credit on your account, paired with our SmartDrive cashback program. This immediately locks in $${savings}/year in direct savings while guaranteeing OEM repair standards.
 
 Review your new protected rate with one click below, or schedule a 5-minute call with your dedicated advisor.`;
     } else if (event?.id === 'NEW_CHILD') {
-      emailSubject = `Congratulations on Baby Lucas! A personalized protection gift from Magic Insurance`;
+      emailSubject = `Congratulations on your new family addition! A personalized protection plan from Magic Insurance`;
       emailBody = `Hi ${firstName},
 
-Warmest congratulations to you and David on welcoming baby Lucas to the world! Becoming parents is one of life’s most exciting chapters.
+Warmest congratulations to you and your family on welcoming a new dependent to your household!
 
-As your family grows, making sure Lucas is financially protected through every milestone is paramount. We’ve configured a tailored Family Term Life & Future Scholar bundle specifically for your household.
+As your household grows, making sure your family is financially protected through every milestone is paramount. We have configured a tailored Family Term Life and Future Scholar bundle specifically for your household.
 
-Because you already trust us with your auto insurance, this unlocks our ${discount}% Multi-Line Parent Discount, saving you $${savings}/year while securing a guaranteed family safety net.
+Because you already trust us with your active insurance policies, this unlocks our ${discount}% Multi-Line Family Discount, saving you $${savings}/year while securing a guaranteed safety net.
 
-Explore your instant family quote below—no medical exam needed for pre-approved members.`;
+Explore your instant quote below to activate pre-approved coverage with no medical exam required.`;
     } else if (event?.id === 'HOME_PURCHASE') {
-      emailSubject = `Congratulations on your new home in Denver! Let's lock in your bundle savings`;
+      emailSubject = `Congratulations on your new home in ${customer.location}! Let's lock in your bundle savings`;
       emailBody = `Hi ${firstName},
 
 Congratulations on your new home! Closing on a property is a tremendous milestone, and protecting your new investment should be effortless.
 
-Before your closing lender arranges third-party hazard coverage, we’ve created an executive Homeowners Elite proposal with extended dwelling and premises liability. 
+Before third-party lender hazard insurance is arranged, we have created an executive Homeowners Elite proposal with extended dwelling and premises liability.
 
-By linking this with your existing premier auto policy, you unlock an instant $${savings} annual multi-policy discount with complete replacement-cost backing.`;
+By linking this with your existing active policy, you unlock an instant $${savings} annual multi-policy discount with complete replacement-cost backing.`;
     } else {
-      emailSubject = `Tailored protection review & ${discount}% multi-policy savings for ${firstName}`;
+      emailSubject = `Tailored protection review and ${discount}% multi-policy savings for ${firstName}`;
       emailBody = `Hi ${firstName},
 
 We noticed an opportunity to enhance your coverage with ${productName} while reducing your overall premium by $${savings} through our multi-line loyalty program.
@@ -423,17 +416,17 @@ Take a look at your customized rate breakdown below.`;
 
     // Channel 2: Agent / Advisor Call Talking Points
     const advisorScript = [
-      `Warm Opening: "Hi ${firstName}, this is your personal Magic Insurance advisor calling to touch base and congratulate you on ${event?.label || 'your recent milestone'}."`,
-      `Empathy & Context: "I was reviewing your account, and noticed that while your current coverage has served you well, your household needs have evolved."`,
-      `Value Proposition: "Instead of waiting for renewal, we can lock in ${productName} today with an active ${discount}% bundle credit, effectively saving you $${savings} annually."`,
+      `Warm Introduction: "Hello ${firstName}, this is your personal Magic Insurance advisor calling to follow up on your account coverage."`,
+      `Context and Eligibility: "I noticed your household is now eligible for ${productName}. Given your recent milestone, this fills an important safety net gap."`,
+      `Value Proposition: "Because of your existing loyalty with us, bundling this will save you $${savings}/year directly off your annual bill."`,
       `Objection Handling: "By bundling with your existing policies, the multi-line discount offsets the cost of this extra protection."`,
-      `Closing Question: "Shall I send the 1-click binding link to your portal right now so your family is covered starting today?"`
+      `Closing and Binding: "Shall I send the pre-filled digital binder directly to your portal for electronic signature?"`
     ];
 
     // Channel 3: In-App Mobile Push Notification
     const pushNotification = {
-      title: nba.type === 'RETENTION_DEFENSE' ? `🛡️ $${savings} Loyalty Credit Available` : `✨ New Milestone Protection Pre-Approved`,
-      body: `Tap to review your tailored ${productName} proposal with ${discount}% bundle savings.`,
+      title: nba.type === 'RETENTION_DEFENSE' ? `Loyalty Rate Credit Available ($${savings}/yr)` : `New Milestone Protection Pre-Approved`,
+      body: `Review your tailored ${productName} proposal with ${discount}% bundle savings.`,
       actionLabel: 'View Pre-Approved Offer'
     };
 
@@ -471,7 +464,6 @@ Take a look at your customized rate breakdown below.`;
       detectedSignals: [newSignal, ...customer.detectedSignals]
     };
 
-    // Dynamically update churn risk based on simulated event
     if (eventTypeId === 'PRICE_INCREASE_SHOCK') {
       updatedCustomer.churnRiskScore = Math.min(95, customer.churnRiskScore + 35);
       updatedCustomer.churnRiskTier = 'CRITICAL';

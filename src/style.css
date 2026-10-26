@@ -347,6 +347,24 @@ body {
   color: var(--emerald-success);
 }
 
+.metric-pill.highlight-metric {
+  border-left: 3px solid var(--blue-primary);
+  background: linear-gradient(135deg, #FFFFFF, #F0F9FF);
+}
+
+[data-theme="dark"] .metric-pill.highlight-metric {
+  border-left: 3px solid var(--cyan-primary);
+  background: rgba(14, 165, 233, 0.08);
+}
+
+.metric-pill.highlight-metric .metric-pill-val {
+  color: var(--blue-primary);
+}
+
+[data-theme="dark"] .metric-pill.highlight-metric .metric-pill-val {
+  color: var(--cyan-primary);
+}
+
 /* Theme Toggle Button */
 .theme-toggle-btn {
   display: inline-flex;

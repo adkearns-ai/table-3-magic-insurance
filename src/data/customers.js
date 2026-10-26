@@ -1,11 +1,11 @@
-// High-value realistic customer profiles for insurance next-best-action & retention
+// Realistic customer profiles for Magic Insurance next-best-action & retention
 export const INITIAL_CUSTOMERS = [
   {
     id: 'CUST-8021',
     name: 'Sarah & David Jenkins',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
     age: 34,
-    household: 'Married, 1 Newborn (Lucas, 3 months)',
+    household: 'Married Household with Dependents',
     location: 'Austin, TX',
     occupation: 'Senior UX Designer & Mechanical Engineer',
     tenureYears: 4.2,
@@ -26,7 +26,7 @@ export const INITIAL_CUSTOMERS = [
       {
         id: 'SIG-901',
         type: 'NEW_CHILD',
-        title: 'Newborn Lucas Added to Healthcare Registry',
+        title: 'New Dependent Added to Healthcare Registry',
         timestamp: '3 days ago',
         source: 'Vital Statistics & Dependent Enrollment Stream',
         confidence: 0.96,
@@ -55,7 +55,7 @@ export const INITIAL_CUSTOMERS = [
     name: 'Marcus Vance',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=160&q=80',
     age: 43,
-    household: 'Married, 2 Children (Ages 8 & 11)',
+    household: 'Married Household with Dependents',
     location: 'Denver, CO',
     occupation: 'VP of Engineering',
     tenureYears: 6.5,
@@ -83,7 +83,7 @@ export const INITIAL_CUSTOMERS = [
       {
         id: 'SIG-303',
         type: 'PROPERTY_RISK',
-        title: 'In-Ground Heated Pool & Trampoline Permit Filed',
+        title: 'In-Ground Heated Pool & Facility Permit Filed',
         timestamp: '1 week ago',
         source: 'Municipal Permitting API',
         confidence: 0.94,
@@ -201,7 +201,7 @@ export const INITIAL_CUSTOMERS = [
     name: 'Amara & Tunde Okafor',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=160&q=80',
     age: 47,
-    household: 'Married, 2 Teenagers (Ages 15 & 17)',
+    household: 'Married Household with Teen Drivers',
     location: 'Charlotte, NC',
     occupation: 'Pharmacy Chain Owner & Civil Attorney',
     tenureYears: 8.3,
@@ -210,7 +210,7 @@ export const INITIAL_CUSTOMERS = [
     churnRiskScore: 39,
     churnRiskTier: 'LOW',
     churnDrivers: [
-      'Upcoming teen driver rate shock anticipated next month'
+      'Upcoming teen driver rate adjustment anticipated next month'
     ],
     activePolicies: [
       { id: 'POL-H711', type: 'Homeowners Deluxe ($720k Dwelling)', annualPremium: 1850, status: 'Active', renewalDate: '2027-05-12' },
@@ -220,7 +220,7 @@ export const INITIAL_CUSTOMERS = [
       {
         id: 'SIG-219',
         type: 'TEEN_DRIVER',
-        title: 'Eldest Daughter Nia (17) Received Driver License',
+        title: 'Dependent Received Driver License',
         timestamp: '1 week ago',
         source: 'State DMV Registration Event Sync',
         confidence: 0.98,

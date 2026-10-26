@@ -1,4 +1,4 @@
-// Insurance Product Catalog & Life Event Rules
+// Insurance Product Catalog & Life Event Rules (No Emojis)
 export const INSURANCE_PRODUCTS = {
   TERM_LIFE: {
     id: 'TERM_LIFE',
@@ -8,8 +8,8 @@ export const INSURANCE_PRODUCTS = {
     averageCrossSellLift: 720,
     description: 'Guaranteed financial security replacing income, paying off mortgages, and protecting dependents.',
     retentionImpact: '+24% policy stickiness',
-    eligibilityKeywords: ['child', 'marriage', 'home', 'mortgage', 'sole-earner'],
-    idealLifeStages: ['New Parents', 'Newly Married', 'New Homeowner']
+    eligibilityKeywords: ['dependent', 'marriage', 'home', 'mortgage', 'sole-earner'],
+    idealLifeStages: ['Family with Dependents', 'Newly Married', 'New Homeowner']
   },
   HOMEOWNERS_PLUS: {
     id: 'HOMEOWNERS_PLUS',
@@ -28,10 +28,10 @@ export const INSURANCE_PRODUCTS = {
     category: 'Liability Shield',
     baseAnnualPremium: 320,
     averageCrossSellLift: 380,
-    description: 'Secondary liability safety net protecting personal assets against catastrophic lawsuits, teen driver accidents, and property injuries.',
+    description: 'Secondary liability safety net protecting personal assets against catastrophic lawsuits and premises injury claims.',
     retentionImpact: '+42% retention when bundled with Auto & Home',
-    eligibilityKeywords: ['pool', 'teen_driver', 'rental_property', 'wealth_growth', 'dog_breed'],
-    idealLifeStages: ['Growing Family', 'Teen Drivers', 'High Net Worth', 'Property Owner']
+    eligibilityKeywords: ['pool', 'youth_driver', 'rental_property', 'wealth_growth'],
+    idealLifeStages: ['Growing Family', 'Household Drivers', 'High Net Worth', 'Property Owner']
   },
   CHILD_EDUCATION_RIDER: {
     id: 'CHILD_EDUCATION_RIDER',
@@ -39,10 +39,10 @@ export const INSURANCE_PRODUCTS = {
     category: 'Wealth & Savings',
     baseAnnualPremium: 540,
     averageCrossSellLift: 600,
-    description: 'Tax-advantaged cash accumulation rider for college tuition funding with guaranteed insurability for the child.',
+    description: 'Tax-advantaged cash accumulation rider for education funding with guaranteed insurability for dependents.',
     retentionImpact: '+48% 10-year retention (emotional anchor)',
-    eligibilityKeywords: ['child', 'newborn', 'preschool', 'college_fund'],
-    idealLifeStages: ['New Parents', 'Young Family']
+    eligibilityKeywords: ['dependent', 'education_fund', 'family_planning'],
+    idealLifeStages: ['Family with Dependents', 'Young Family']
   },
   CONNECTED_AUTO_BUNDLE: {
     id: 'CONNECTED_AUTO_BUNDLE',
@@ -63,7 +63,7 @@ export const INSURANCE_PRODUCTS = {
     averageCrossSellLift: 4200,
     description: 'Fixed-indexed lifetime income stream insulating seniors against market downturns and outliving savings.',
     retentionImpact: '+55% account retention into retirement',
-    eligibilityKeywords: ['retirement_horizon', 'empty_nest', 'pension_gap', 'age_55_plus'],
+    eligibilityKeywords: ['retirement_horizon', 'empty_nest', 'pension_gap'],
     idealLifeStages: ['Pre-Retiree', 'Retiree', 'Senior']
   },
   CYBER_IDENTITY_SHIELD: {
@@ -74,7 +74,7 @@ export const INSURANCE_PRODUCTS = {
     averageCrossSellLift: 240,
     description: 'Complete ransomware reimbursement, digital extortion assistance, and 24/7 dark web credit monitoring for the entire household.',
     retentionImpact: '+18% bundle stickiness',
-    eligibilityKeywords: ['remote_work', 'teens', 'crypto', 'tech_worker'],
+    eligibilityKeywords: ['remote_work', 'tech_worker', 'digital_security'],
     idealLifeStages: ['Connected Family', 'Remote Professional']
   }
 };
@@ -82,72 +82,65 @@ export const INSURANCE_PRODUCTS = {
 export const LIFE_EVENT_TYPES = {
   NEW_CHILD: {
     id: 'NEW_CHILD',
-    label: 'Welcomed a New Child / Baby',
-    icon: '👶',
+    label: 'Welcomed a New Dependent',
     urgency: 'HIGH',
     timeWindowDays: 60,
     signals: ['Hospital birth registry record', 'Maternity leave flag', 'Dependent added to portal', 'Pediatrician claim inquiry'],
     recommendedProducts: ['TERM_LIFE', 'CHILD_EDUCATION_RIDER', 'UMBRELLA_LIABILITY'],
-    retentionRiskFactor: 0.15 // May review budget, need proactive help
+    retentionRiskFactor: 0.15
   },
   HOME_PURCHASE: {
     id: 'HOME_PURCHASE',
     label: 'Purchased a New Home',
-    icon: '🏡',
     urgency: 'CRITICAL',
     timeWindowDays: 30,
     signals: ['County deed registry update', 'Mortgage pre-approval inquiry', 'Address change request', 'Renters policy termination notice'],
     recommendedProducts: ['HOMEOWNERS_PLUS', 'UMBRELLA_LIABILITY', 'TERM_LIFE'],
-    retentionRiskFactor: 0.65 // Massive churn risk: mortgage lenders often push partner insurers!
+    retentionRiskFactor: 0.65
   },
   MARRIAGE: {
     id: 'MARRIAGE',
     label: 'Recently Married',
-    icon: '💍',
     urgency: 'MEDIUM',
     timeWindowDays: 90,
     signals: ['Name change on license/portal', 'Spouse added as driver', 'Joint account linked', 'Wedding registry match'],
     recommendedProducts: ['CONNECTED_AUTO_BUNDLE', 'TERM_LIFE', 'HOMEOWNERS_PLUS'],
-    retentionRiskFactor: 0.40 // Policy consolidation opportunity (or loss to spouse’s insurer)
+    retentionRiskFactor: 0.40
   },
   NEW_VEHICLE: {
     id: 'NEW_VEHICLE',
     label: 'Purchased New Vehicle (EV / SUV)',
-    icon: '🚗',
     urgency: 'HIGH',
     timeWindowDays: 14,
     signals: ['Dealership gap-insurance inquiry', 'DMV registration notice', 'Financing credit pull', 'Auto VIN quote search'],
     recommendedProducts: ['CONNECTED_AUTO_BUNDLE', 'UMBRELLA_LIABILITY'],
-    retentionRiskFactor: 0.50 // Dealerships push point-of-sale insurance
+    retentionRiskFactor: 0.50
   },
   TEEN_DRIVER: {
     id: 'TEEN_DRIVER',
-    label: 'Teen Reached Driving Age (16)',
-    icon: '🎓',
+    label: 'New Eligible Driver in Household',
     urgency: 'HIGH',
     timeWindowDays: 45,
-    signals: ['Permit driver addition', 'Dependent turning 16', 'Inquiry on student driver discount'],
+    signals: ['Permit driver addition', 'Dependent added to vehicle policy', 'Inquiry on student driver discount'],
     recommendedProducts: ['UMBRELLA_LIABILITY', 'CONNECTED_AUTO_BUNDLE'],
-    retentionRiskFactor: 0.45 // Rate shock often causes shopping around
+    retentionRiskFactor: 0.45
   },
   RETIREMENT_HORIZON: {
     id: 'RETIREMENT_HORIZON',
-    label: 'Approaching Retirement (Within 3-5 Years)',
-    icon: '🏖️',
+    label: 'Approaching Retirement Milestone',
     urgency: 'MEDIUM',
     timeWindowDays: 180,
-    signals: ['Milestone age 58-62 reached', '401k rollover inquiry', 'Downsizing property search', 'Reduced annual mileage reported'],
+    signals: ['Milestone age reached', 'Retirement savings rollover inquiry', 'Downsizing property search', 'Reduced annual mileage reported'],
     recommendedProducts: ['RETIREMENT_LONGEVITY_ANNUITY', 'UMBRELLA_LIABILITY'],
-    retentionRiskFactor: 0.35 // Lifestyle shift triggers policy cleanup
+    retentionRiskFactor: 0.35
   },
   PRICE_INCREASE_SHOCK: {
     id: 'PRICE_INCREASE_SHOCK',
     label: 'Renewal Rate Adjustment Sensitivity',
-    icon: '⚠️',
     urgency: 'CRITICAL',
     timeWindowDays: 21,
-    signals: ['Renewal invoice +12% YoY generated', 'Customer visited cancellation FAQ', 'Logged into portal 4x in 48 hours', 'Competitor aggregator search detected'],
+    signals: ['Renewal invoice adjustment generated', 'Customer visited cancellation FAQ', 'Logged into portal multiple times', 'Competitor aggregator search detected'],
     recommendedProducts: ['CONNECTED_AUTO_BUNDLE'],
-    retentionRiskFactor: 0.88 // Acute churn risk!
+    retentionRiskFactor: 0.88
   }
 };
