@@ -154,18 +154,21 @@ function renderApp() {
           `).join('')}
         </div>
 
-        <input 
-          type="text" 
-          class="sim-custom-note" 
-          id="sim-custom-input" 
-          placeholder="Optional: custom context (e.g., 'Closed on $750k home in Austin suburbs')" 
-        />
+        <div style="margin-top:1.25rem;">
+          <label style="display:block; font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-dim); margin-bottom:0.4rem;">
+            Custom Life Event Context
+          </label>
+          <input 
+            type="text" 
+            id="sim-custom-input" 
+            class="form-input-text" 
+            placeholder="e.g. Added newborn dependent, purchased single-family home in Austin..." 
+          />
+        </div>
 
-        <div class="sim-actions-row">
-          <button class="btn-secondary" id="btn-cancel-sim">Cancel</button>
-          <button class="action-btn-primary" id="btn-run-simulation">
-            Trigger Event & Re-evaluate
-          </button>
+        <div class="modal-footer">
+          <button class="action-btn-secondary" id="btn-cancel-sim">Cancel</button>
+          <button class="action-btn-primary" id="btn-run-simulation">Run Event Simulation</button>
         </div>
       </div>
     </div>
@@ -179,7 +182,7 @@ function renderApp() {
   attachEventListeners();
 }
 
-// Render Command Center
+// Render Command Center View
 function renderCommandCenter(customer, evaluation, activeOfferProduct) {
   const filteredCustomers = state.customers.filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
@@ -188,7 +191,7 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
     return matchesSearch && matchesRisk;
   });
 
-  const currentPolicies = evaluation.currentInsurances || customer.activePolicies || [];
+  const currentPolicies = customer.activePolicies || [];
   const eligibleInsurances = evaluation.eligibleInsurances || [];
 
   return `
@@ -342,9 +345,9 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
 
           <div class="eligible-cards-list">
             ${eligibleInsurances.map(item => {
-    const isSelected = activeOfferProduct?.id === item.id;
-    const tierClass = item.likelihood >= 80 ? 'very-high' : item.likelihood >= 65 ? 'high' : 'moderate';
-    return `
+              const isSelected = activeOfferProduct?.id === item.id;
+              const tierClass = item.likelihood >= 80 ? 'very-high' : item.likelihood >= 65 ? 'high' : 'moderate';
+              return `
                 <div class="eligible-card ${item.isTopRecommendation ? 'top-nba' : ''} ${isSelected ? 'selected-card' : ''}">
                   <div class="eligible-card-header">
                     <div>
@@ -387,7 +390,7 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
                   </div>
                 </div>
               `;
-  }).join('')}
+            }).join('')}
           </div>
         </div>
       </section>
@@ -430,604 +433,6 @@ function renderCommandCenter(customer, evaluation, activeOfferProduct) {
     </div>
   `;
 }
-
-// Rate calculation engine for formulated offer
-function getOfferRateCalculation(lead, config) {
-  if (!lead || !config) {
-    return {
-      monthly: 0,
-      annual: 0,
-      bundleSavings: 0,
-      closingLikelihood: 85,
-      essentialMonthly: 0,
-      recommendedMonthly: 0,
-      eliteMonthly: 0
-    };
-  }
-
-  const baseQuote = lead.monthlyQuote || 100;
-
-  // Calculate baseline monthly for each tier
-  const essentialBase = Math.round(baseQuote * 0.84);
-  const recommendedBase = baseQuote;
-  const eliteBase = Math.round(baseQuote * 1.30);
-
-  let activeBase = config.selectedTier === 'essential' ? essentialBase :
-                   config.selectedTier === 'elite' ? eliteBase :
-                   recommendedBase;
-
-  // Deductible adjustment
-  let deductibleDelta = 0;
-  if (config.deductible === 250) deductibleDelta = 12;
-  else if (config.deductible === 1000) deductibleDelta = -10;
-
-  // Liability adjustment
-  let liabilityDelta = 0;
-  if (config.liabilityLimit === 'standard') liabilityDelta = -6;
-  else if (config.liabilityLimit === 'maximum') liabilityDelta = 14;
-
-  // Addons adjustment
-  let addonsDelta = 0;
-  if (config.addons?.roadside) addonsDelta += 8;
-  if (config.addons?.rental) addonsDelta += 6;
-  if (config.addons?.glass) addonsDelta += 5;
-  if (config.addons?.oemParts) addonsDelta += 12;
-
-  let computedMonthly = Math.max(35, activeBase + deductibleDelta + liabilityDelta + addonsDelta);
-
-  // Agent discretionary discount
-  if (config.agentDiscountPercent > 0) {
-    computedMonthly = Math.round(computedMonthly * (1 - config.agentDiscountPercent / 100));
-  }
-
-  // Custom manual override if provided
-  if (config.customMonthlyOverride !== null && config.customMonthlyOverride !== undefined && !isNaN(config.customMonthlyOverride) && config.customMonthlyOverride > 0) {
-    computedMonthly = Math.round(Number(config.customMonthlyOverride));
-  }
-
-  const annual = Math.round(computedMonthly * 12 * 0.92); // 8% pay-in-full discount
-  const bundleSavings = Math.round(annual * 0.18);
-
-  // Dynamic closing likelihood
-  let closingLikelihood = lead.closingLikelihood || 88;
-  if (config.agentDiscountPercent >= 10) closingLikelihood = Math.min(99, closingLikelihood + 7);
-  else if (config.agentDiscountPercent >= 5) closingLikelihood = Math.min(97, closingLikelihood + 4);
-  if (config.selectedTier === 'essential') closingLikelihood = Math.min(96, closingLikelihood + 3);
-  if (config.selectedTier === 'elite' && config.agentDiscountPercent === 0) closingLikelihood = Math.max(74, closingLikelihood - 4);
-
-  return {
-    monthly: computedMonthly,
-    annual,
-    bundleSavings,
-    closingLikelihood,
-    essentialMonthly: essentialBase,
-    recommendedMonthly: recommendedBase,
-    eliteMonthly: eliteBase
-  };
-}
-
-function initiateBindAndConvert(leadId) {
-  const lead = state.leads.find(l => l.id === leadId);
-  if (!lead) return;
-
-  state.activeBindLeadId = leadId;
-  state.activeOfferConfig = {
-    leadId: lead.id,
-    selectedTier: 'recommended',
-    deductible: 500,
-    liabilityLimit: 'enhanced',
-    addons: {
-      roadside: true,
-      rental: false,
-      glass: true,
-      oemParts: lead.carClassKey === 'ev' || lead.carClassKey === 'luxury'
-    },
-    agentDiscountPercent: 0,
-    paymentFrequency: 'monthly',
-    customMonthlyOverride: null,
-    effectiveDate: new Date().toISOString().split('T')[0],
-    agentNotes: `Inbound inquiry for ${lead.carClass}. Underwriting rating tier: ${lead.tier}.`
-  };
-
-  state.currentView = 'bind-convert';
-  renderApp();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// Render Bind & Convert: Recommended Rates & Formulated Offer View
-function renderBindConvertView() {
-  const lead = state.leads.find(l => l.id === state.activeBindLeadId) || state.leads[0];
-  if (!lead) {
-    return `<div style="padding:2rem;">No active lead found. <button class="action-btn-primary" id="btn-back-to-leads">Back to Inbound Leads</button></div>`;
-  }
-
-  const config = state.activeOfferConfig || {
-    leadId: lead.id,
-    selectedTier: 'recommended',
-    deductible: 500,
-    liabilityLimit: 'enhanced',
-    addons: { roadside: true, rental: false, glass: true, oemParts: false },
-    agentDiscountPercent: 0,
-    paymentFrequency: 'monthly',
-    customMonthlyOverride: null,
-    effectiveDate: new Date().toISOString().split('T')[0]
-  };
-
-  const rates = getOfferRateCalculation(lead, config);
-  const initials = lead.fullName.split(' ').map(n => n[0]).join('').slice(0, 2);
-
-  const tierMeta = {
-    essential: {
-      name: 'Essential Standard',
-      desc: 'State compliance and core liability with standard roadside assistance.',
-      deductible: '$1,000 Deductible',
-      liability: '$50k / $100k / $50k Liability',
-      features: ['State Minimum & Bodily Injury ($50k/$100k)', 'Collision & Comprehensive ($1k Deductible)', 'Standard Emergency Roadside Dispatch']
-    },
-    recommended: {
-      name: 'Magic Preferred (AI Recommended)',
-      desc: 'Optimal protection tailored for driving record, vehicle class, and high retention.',
-      deductible: '$500 Deductible (Recommended)',
-      liability: '$100k / $300k / $100k Enhanced Liability',
-      features: ['Enhanced Bodily Injury & Property ($100k/$300k)', 'Collision & Comprehensive ($500 Deductible)', '24/7 National Towing & Roadside Assistance', 'Zero-Deductible Full Windshield & Glass', 'Multi-Policy Bundle Savings Credit']
-    },
-    elite: {
-      name: 'Comprehensive Elite',
-      desc: 'Maximum coverage with OEM replacement parts, rental reimbursement, and gap protection.',
-      deductible: '$250 Deductible',
-      liability: '$250k / $500k / $250k Umbrella Ready',
-      features: ['Maximum Umbrella-Ready Liability ($250k/$500k)', 'Low $250 Collision & Comprehensive Deductible', 'OEM Genuine Parts Replacement Guarantee', 'Rental Car Reimbursement ($45/day)', 'Full Glass & Comprehensive Gap Protection']
-    }
-  };
-
-  const currentTierInfo = tierMeta[config.selectedTier] || tierMeta.recommended;
-
-  const liabilityLabels = {
-    standard: '$50,000 / $100,000 / $50,000',
-    enhanced: '$100,000 / $300,000 / $100,000',
-    maximum: '$250,000 / $500,000 / $250,000'
-  };
-
-  return `
-    <div class="bind-convert-view">
-      <!-- Breadcrumb and Top Navigation -->
-      <div class="bind-header-bar">
-        <div class="bind-breadcrumb">
-          <button class="bind-breadcrumb-btn" id="btn-back-to-leads">
-            &larr; Back to Inbound Leads Pipeline
-          </button>
-          <span>/</span>
-          <span style="color:var(--text-bright); font-weight:700;">Bind & Convert Offer Formulation</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:0.75rem;">
-          <span class="policy-status-pill" style="background:#E0F2FE; color:#0369A1; border-color:#BAE6FD;">
-            Binder Inception Engine
-          </span>
-          <span class="likelihood-badge-pill ${rates.closingLikelihood >= 88 ? 'very-high' : 'high'}">
-            ${rates.closingLikelihood}% Closing Likelihood
-          </span>
-        </div>
-      </div>
-
-      <!-- Applicant Overview Banner -->
-      <div class="bind-prospect-banner">
-        <div class="bind-prospect-profile">
-          <div class="bind-prospect-avatar">${initials}</div>
-          <div class="bind-prospect-details">
-            <h2>${lead.fullName}</h2>
-            <div class="bind-prospect-meta">
-              <span>${lead.email}</span>
-              <span>&bull;</span>
-              <span>${lead.phone}</span>
-              <span>&bull;</span>
-              <span>${lead.location}</span>
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-          <span class="bind-prospect-pill">Vehicle: <strong>${lead.carClass}</strong></span>
-          <span class="bind-prospect-pill">Experience: <strong>${lead.drivingExperience} yrs</strong></span>
-          <span class="bind-prospect-pill">Record: <strong>${lead.record}</strong></span>
-          <span class="bind-prospect-pill">Mileage: <strong>${lead.annualMileage}</strong></span>
-          <span class="bind-prospect-pill">Rating Tier: <strong>${lead.tier}</strong></span>
-        </div>
-      </div>
-
-      <!-- Main Layout Columns: Left = Recommended Rates & Adjustments, Right = Formulated Binder Offer -->
-      <div class="bind-layout-columns">
-        <div style="display:flex; flex-direction:column; gap:1.5rem;">
-          
-          <!-- Section 1: Recommended Rates for this Customer -->
-          <div class="glass-panel" style="padding:1.5rem;">
-            <div class="panel-header" style="margin-bottom:0.25rem;">
-              <div>
-                <h3 class="panel-title" style="font-size:1.1rem;">Recommended Rates for ${lead.fullName}</h3>
-                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">
-                  AI actuarial underwriting recommendations based on applicant's driving record, vehicle class, and risk tier.
-                </p>
-              </div>
-            </div>
-
-            <!-- Tier Cards Grid -->
-            <div class="tier-cards-grid">
-              <!-- Essential -->
-              <div class="tier-rate-card ${config.selectedTier === 'essential' ? 'selected' : ''}" data-select-tier="essential">
-                <div>
-                  <div class="tier-name">${tierMeta.essential.name}</div>
-                  <div class="tier-desc">${tierMeta.essential.desc}</div>
-                  <div class="tier-price-display">
-                    <span class="tier-price-val">$${rates.essentialMonthly}</span>
-                    <span class="tier-price-period">/mo</span>
-                  </div>
-                  <div class="tier-annual-sub">$${Math.round(rates.essentialMonthly * 12 * 0.92)}/yr (8% pay-in-full discount)</div>
-                  <ul class="tier-feature-list">
-                    ${tierMeta.essential.features.map(f => `
-                      <li class="tier-feature-item">
-                        <span class="tier-feature-bullet">&check;</span>
-                        <span>${f}</span>
-                      </li>
-                    `).join('')}
-                  </ul>
-                </div>
-                <button type="button" class="tier-select-btn">
-                  ${config.selectedTier === 'essential' ? 'Selected Package' : 'Select Package'}
-                </button>
-              </div>
-
-              <!-- Recommended Magic Preferred -->
-              <div class="tier-rate-card recommended ${config.selectedTier === 'recommended' ? 'selected' : ''}" data-select-tier="recommended">
-                <span class="tier-recommended-ribbon">AI Recommended</span>
-                <div>
-                  <div class="tier-name">${tierMeta.recommended.name}</div>
-                  <div class="tier-desc">${tierMeta.recommended.desc}</div>
-                  <div class="tier-price-display">
-                    <span class="tier-price-val" style="color:var(--blue-primary);">$${rates.recommendedMonthly}</span>
-                    <span class="tier-price-period">/mo</span>
-                  </div>
-                  <div class="tier-annual-sub">$${lead.annualQuote}/yr (Includes bundle savings)</div>
-                  <ul class="tier-feature-list">
-                    ${tierMeta.recommended.features.map(f => `
-                      <li class="tier-feature-item">
-                        <span class="tier-feature-bullet" style="color:var(--emerald-success);">&check;</span>
-                        <span>${f}</span>
-                      </li>
-                    `).join('')}
-                  </ul>
-                </div>
-                <button type="button" class="tier-select-btn">
-                  ${config.selectedTier === 'recommended' ? 'Active Recommended Package' : 'Select Package'}
-                </button>
-              </div>
-
-              <!-- Elite -->
-              <div class="tier-rate-card ${config.selectedTier === 'elite' ? 'selected' : ''}" data-select-tier="elite">
-                <div>
-                  <div class="tier-name">${tierMeta.elite.name}</div>
-                  <div class="tier-desc">${tierMeta.elite.desc}</div>
-                  <div class="tier-price-display">
-                    <span class="tier-price-val">$${rates.eliteMonthly}</span>
-                    <span class="tier-price-period">/mo</span>
-                  </div>
-                  <div class="tier-annual-sub">$${Math.round(rates.eliteMonthly * 12 * 0.92)}/yr (Premium tier)</div>
-                  <ul class="tier-feature-list">
-                    ${tierMeta.elite.features.map(f => `
-                      <li class="tier-feature-item">
-                        <span class="tier-feature-bullet">&check;</span>
-                        <span>${f}</span>
-                      </li>
-                    `).join('')}
-                  </ul>
-                </div>
-                <button type="button" class="tier-select-btn">
-                  ${config.selectedTier === 'elite' ? 'Selected Package' : 'Select Package'}
-                </button>
-              </div>
-            </div>
-
-            <!-- Underwriting Actuarial Factors -->
-            <div class="underwriting-breakdown-box" style="margin-top:1.25rem;">
-              <div style="font-size:0.75rem; font-weight:700; color:var(--text-bright); text-transform:uppercase; letter-spacing:0.04em;">
-                Actuarial Underwriting Factors & Rate Justification
-              </div>
-              <div class="breakdown-factors-grid">
-                <div class="breakdown-factor-item">
-                  <span class="factor-label">Driving Record</span>
-                  <span class="factor-value">${lead.record.includes('Clean') ? 'Clean Record' : 'Standard'}</span>
-                  <span class="factor-credit">${lead.record.includes('Clean') ? '-12% Safe Driver Credit' : 'Base Rate'}</span>
-                </div>
-                <div class="breakdown-factor-item">
-                  <span class="factor-label">Driving Experience</span>
-                  <span class="factor-value">${lead.drivingExperience} Years</span>
-                  <span class="factor-credit">${lead.drivingExperience >= 5 ? '-8% Seasoned Credit' : 'Standard Tier'}</span>
-                </div>
-                <div class="breakdown-factor-item">
-                  <span class="factor-label">Vehicle Risk Class</span>
-                  <span class="factor-value">${lead.carClass.split('(')[0].trim()}</span>
-                  <span class="factor-credit" style="color:var(--blue-primary);">5-Star Safety Profile</span>
-                </div>
-                <div class="breakdown-factor-item">
-                  <span class="factor-label">Bundle Incentive</span>
-                  <span class="factor-value">Save $${lead.bundleSavings}/yr</span>
-                  <span class="factor-credit">Multi-Policy Discount</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Section 2: Option to Adjust the Offer -->
-          <div class="glass-panel" style="padding:1.5rem;" id="adjust-offer-section">
-            <div class="panel-header" style="margin-bottom:0.75rem;">
-              <div>
-                <h3 class="panel-title" style="font-size:1.1rem;">Adjust Offer Parameters</h3>
-                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">
-                  As an insurance agent, you can customize coverage limits, deductibles, endorsements, or apply discretionary discounts.
-                </p>
-              </div>
-              <button class="btn-bind-reset" id="btn-reset-offer" style="width:auto; padding:0.35rem 0.75rem;">
-                Reset to Recommended
-              </button>
-            </div>
-
-            <div class="adjust-offer-panel">
-              <!-- Deductible Selection -->
-              <div class="adjust-field-group">
-                <div class="adjust-field-header">
-                  <span>Comprehensive & Collision Deductible</span>
-                  <span style="font-size:0.7rem; color:var(--text-muted);">Current: $${config.deductible}</span>
-                </div>
-                <div class="adjust-options-pills">
-                  <div class="adjust-option-pill ${config.deductible === 250 ? 'active' : ''}" data-adjust-deductible="250">
-                    $250 (+$12/mo)
-                  </div>
-                  <div class="adjust-option-pill ${config.deductible === 500 ? 'active' : ''}" data-adjust-deductible="500">
-                    $500 (Recommended)
-                  </div>
-                  <div class="adjust-option-pill ${config.deductible === 1000 ? 'active' : ''}" data-adjust-deductible="1000">
-                    $1,000 (-$10/mo)
-                  </div>
-                </div>
-              </div>
-
-              <!-- Liability Limit Selection -->
-              <div class="adjust-field-group">
-                <div class="adjust-field-header">
-                  <span>Bodily Injury & Property Damage Limits</span>
-                  <span style="font-size:0.7rem; color:var(--text-muted);">${liabilityLabels[config.liabilityLimit]}</span>
-                </div>
-                <div class="adjust-options-pills">
-                  <div class="adjust-option-pill ${config.liabilityLimit === 'standard' ? 'active' : ''}" data-adjust-liability="standard">
-                    Standard ($50k/$100k, -$6/mo)
-                  </div>
-                  <div class="adjust-option-pill ${config.liabilityLimit === 'enhanced' ? 'active' : ''}" data-adjust-liability="enhanced">
-                    Enhanced ($100k/$300k, Recommended)
-                  </div>
-                  <div class="adjust-option-pill ${config.liabilityLimit === 'maximum' ? 'active' : ''}" data-adjust-liability="maximum">
-                    Umbrella-Ready ($250k/$500k, +$14/mo)
-                  </div>
-                </div>
-              </div>
-
-              <!-- Optional Add-ons Checkboxes -->
-              <div class="adjust-field-group">
-                <div class="adjust-field-header">
-                  <span>Coverage Endorsements & Add-ons</span>
-                  <span style="font-size:0.7rem; color:var(--text-muted);">Toggle to include or exclude</span>
-                </div>
-                <div class="addons-toggle-grid">
-                  <div class="addon-toggle-box ${config.addons.roadside ? 'active' : ''}" data-toggle-addon="roadside">
-                    <div class="addon-info">
-                      <span class="addon-name">24/7 Roadside Assistance</span>
-                      <span class="addon-cost">+$8.00 / mo</span>
-                    </div>
-                    <input type="checkbox" class="addon-checkbox" ${config.addons.roadside ? 'checked' : ''} />
-                  </div>
-
-                  <div class="addon-toggle-box ${config.addons.rental ? 'active' : ''}" data-toggle-addon="rental">
-                    <div class="addon-info">
-                      <span class="addon-name">Rental Car Reimbursement</span>
-                      <span class="addon-cost">+$6.00 / mo ($45/day)</span>
-                    </div>
-                    <input type="checkbox" class="addon-checkbox" ${config.addons.rental ? 'checked' : ''} />
-                  </div>
-
-                  <div class="addon-toggle-box ${config.addons.glass ? 'active' : ''}" data-toggle-addon="glass">
-                    <div class="addon-info">
-                      <span class="addon-name">Zero-Deductible Full Glass</span>
-                      <span class="addon-cost">+$5.00 / mo</span>
-                    </div>
-                    <input type="checkbox" class="addon-checkbox" ${config.addons.glass ? 'checked' : ''} />
-                  </div>
-
-                  <div class="addon-toggle-box ${config.addons.oemParts ? 'active' : ''}" data-toggle-addon="oemParts">
-                    <div class="addon-info">
-                      <span class="addon-name">OEM Genuine Replacement Parts</span>
-                      <span class="addon-cost">+$12.00 / mo</span>
-                    </div>
-                    <input type="checkbox" class="addon-checkbox" ${config.addons.oemParts ? 'checked' : ''} />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Agent Discretionary Discount & Custom Rate Override -->
-              <div class="form-row-dual">
-                <div class="adjust-field-group">
-                  <label class="form-label">
-                    <span>Agent Discretionary Discount</span>
-                    <span class="form-label-hint">${config.agentDiscountPercent}% Applied</span>
-                  </label>
-                  <select class="form-select" id="adjust-agent-discount">
-                    <option value="0" ${config.agentDiscountPercent === 0 ? 'selected' : ''}>0% - Standard Recommended Rate</option>
-                    <option value="5" ${config.agentDiscountPercent === 5 ? 'selected' : ''}>5% - Preferred Driver Courtesy Discount</option>
-                    <option value="10" ${config.agentDiscountPercent === 10 ? 'selected' : ''}>10% - Competitive Price Match Guarantee</option>
-                    <option value="15" ${config.agentDiscountPercent === 15 ? 'selected' : ''}>15% - Branch Manager Retention Override</option>
-                  </select>
-                </div>
-
-                <div class="adjust-field-group">
-                  <label class="form-label">
-                    <span>Direct Negotiated Monthly Override</span>
-                    <span class="form-label-hint">${config.customMonthlyOverride ? `Active: $${config.customMonthlyOverride}/mo` : 'Optional'}</span>
-                  </label>
-                  <div style="display:flex; gap:0.5rem;">
-                    <input 
-                      type="number" 
-                      class="form-input-text" 
-                      id="adjust-custom-rate-input" 
-                      placeholder="e.g. 95" 
-                      value="${config.customMonthlyOverride || ''}" 
-                      style="font-family:var(--font-mono);" 
-                    />
-                    <button class="action-btn-primary" id="btn-apply-custom-rate" style="padding:0.6rem 0.9rem; font-size:0.75rem;">
-                      Apply
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Internal Agent Notes -->
-              <div class="adjust-field-group">
-                <label class="form-label">Agent Underwriting & Binder Notes</label>
-                <input 
-                  type="text" 
-                  class="form-input-text" 
-                  id="adjust-agent-notes" 
-                  value="${config.agentNotes || ''}" 
-                  placeholder="Notes recorded on policy binding..." 
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Right Column: Formulated Offer & Binder Summary Card -->
-        <div>
-          <div class="formulated-binder-card">
-            <!-- Binder Header -->
-            <div class="binder-card-header">
-              <div class="binder-logo-title">
-                <div style="font-weight:800; font-size:0.95rem; letter-spacing:0.02em;">MAGIC INSURANCE CORE</div>
-                <div style="font-size:0.68rem; color:#94A3B8;">Official Digital Policy Binder & Offer Proposal</div>
-              </div>
-              <div class="binder-seal-badge">OFFER FORMULATED</div>
-            </div>
-
-            <!-- Binder Body -->
-            <div class="binder-card-body">
-              <!-- Proposal Pitch Narrative -->
-              <div class="binder-proposal-pitch">
-                <strong>Formulated Offer for ${lead.fullName}:</strong>
-                Comprehensive coverage on <em>${lead.carClass}</em> under the <strong>${currentTierInfo.name}</strong>. Includes guaranteed 30-day rate lock and zero-lapse digital binder inception.
-              </div>
-
-              <!-- Billing Plan Selector -->
-              <div style="display:flex; gap:0.5rem; background:var(--bg-darkest); padding:0.25rem; border-radius:var(--radius-sm); border:1px solid var(--border-subtle);">
-                <button 
-                  type="button" 
-                  class="adjust-option-pill ${config.paymentFrequency === 'monthly' ? 'active' : ''}" 
-                  data-payment-freq="monthly"
-                  style="padding:0.4rem;"
-                >
-                  Monthly Payment
-                </button>
-                <button 
-                  type="button" 
-                  class="adjust-option-pill ${config.paymentFrequency === 'annual' ? 'active' : ''}" 
-                  data-payment-freq="annual"
-                  style="padding:0.4rem;"
-                >
-                  Annual Pay-in-Full (Save 8%)
-                </button>
-              </div>
-
-              <!-- Itemized Binder Coverages -->
-              <div class="binder-items-list">
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Applicant:</span>
-                  <span class="binder-item-val">${lead.fullName}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Vehicle Insured:</span>
-                  <span class="binder-item-val">${lead.carClass}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Effective Date:</span>
-                  <span class="binder-item-val" style="font-family:var(--font-mono);">${config.effectiveDate} (Immediate)</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Policy Tier:</span>
-                  <span class="binder-item-val" style="color:var(--blue-primary);">${currentTierInfo.name}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Bodily Injury Limits:</span>
-                  <span class="binder-item-val">${liabilityLabels[config.liabilityLimit]}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Comp & Collision Deductible:</span>
-                  <span class="binder-item-val">$${config.deductible}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Active Endorsements:</span>
-                  <span class="binder-item-val" style="font-size:0.72rem; text-align:right;">
-                    ${Object.keys(config.addons).filter(k => config.addons[k]).join(', ') || 'Core Coverage Only'}
-                  </span>
-                </div>
-                ${config.agentDiscountPercent > 0 ? `
-                  <div class="binder-item-row" style="color:var(--emerald-success);">
-                    <span>Discretionary Agent Discount:</span>
-                    <span style="font-weight:700;">-${config.agentDiscountPercent}%</span>
-                  </div>
-                ` : ''}
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Multi-Policy Bundle Credit:</span>
-                  <span class="binder-item-val" style="color:var(--emerald-success); font-family:var(--font-mono);">Save $${rates.bundleSavings}/yr</span>
-                </div>
-              </div>
-
-              <!-- Highlighted Pricing Display -->
-              <div class="binder-pricing-highlight">
-                <div>
-                  <div style="font-size:0.7rem; text-transform:uppercase; font-weight:700; color:var(--text-dim); letter-spacing:0.04em;">
-                    ${config.paymentFrequency === 'monthly' ? 'Monthly Premium' : 'Annual Pay-in-Full'}
-                  </div>
-                  <div class="binder-monthly-total">
-                    $${config.paymentFrequency === 'monthly' ? rates.monthly : rates.annual}
-                    <span style="font-size:0.85rem; font-weight:500; color:var(--text-dim);">
-                      ${config.paymentFrequency === 'monthly' ? '/mo' : '/yr'}
-                    </span>
-                  </div>
-                </div>
-                <div style="text-align:right;">
-                  <div style="font-size:0.85rem; font-weight:700; color:var(--text-bright); font-family:var(--font-mono);">
-                    ${config.paymentFrequency === 'monthly' ? `$${rates.annual} / year` : `$${rates.monthly} / month equiv.`}
-                  </div>
-                  <div style="font-size:0.7rem; color:var(--emerald-success); font-weight:600; margin-top:0.2rem;">
-                    Down Payment Due: $${config.paymentFrequency === 'monthly' ? rates.monthly : rates.annual}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Action Buttons -->
-              <div class="binder-cta-container">
-                <button class="btn-bind-accept" id="btn-accept-bind-offer">
-                  <span>Accept Offer & Bind Policy</span>
-                  <span style="font-size:1.1rem;">&rarr;</span>
-                </button>
-                <div style="font-size:0.72rem; color:var(--text-muted); text-align:center; line-height:1.35;">
-                  Accepting instantly binds policy coverage, logs underwriting terms, and provisions active customer account.
-                </div>
-                <button class="btn-bind-reset" id="btn-cancel-bind" style="margin-top:0.25rem;">
-                  Cancel & Return to Leads
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 
 // Render dynamic preview for Email / Advisor / Push (No Emojis)
 function renderChannelPreview(channel, customer, product, nba) {
@@ -1072,10 +477,10 @@ Review your personalized proposal below to lock in this preferred member rate.
           <strong>Warm Introduction:</strong> "Hello ${firstName}, this is your personal Magic Insurance advisor calling to follow up on your account coverage."
         </div>
         <div class="advisor-point-card">
-          <strong>Context & Eligibility:</strong> "I noticed your household is now eligible for ${prodName}. Given your recent milestone, this fills an important safety net gap."
+          <strong>Proactive Trigger:</strong> "I noticed recent activity in your account and wanted to verify that your household has optimal coverage for upcoming changes."
         </div>
         <div class="advisor-point-card">
-          <strong>Value Proposition:</strong> "Because of your existing loyalty with us, bundling this will save you $${savings}/year directly off your annual bill."
+          <strong>The Recommendation:</strong> "We pre-approved you for our <em>${prodName}</em>. By bundling this with your existing policy, your household saves an estimated <strong>$${savings}/year</strong> immediately."
         </div>
         <div class="advisor-point-card">
           <strong>Closing & Binding:</strong> "Shall I send the pre-filled digital binder directly to your portal for electronic signature?"
@@ -1084,26 +489,25 @@ Review your personalized proposal below to lock in this preferred member rate.
     `;
   }
 
-  if (channel === 'push') {
-    return `
-      <div style="background:var(--bg-card); border:1px solid var(--border-medium); border-radius:var(--radius-md); padding:1rem; margin-top:2rem; box-shadow:var(--shadow-sm);">
-        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
-          <img src="/dubrovnik-castle-logo.jpg" style="width:24px; height:24px; border-radius:4px;" />
-          <span style="font-size:0.76rem; font-weight:700; color:var(--text-bright);">Magic Insurance Mobile Portal</span>
-          <span style="font-size:0.68rem; color:var(--text-dim); margin-left:auto;">Now</span>
-        </div>
-        <div style="font-size:0.84rem; font-weight:700; color:var(--text-bright); margin-bottom:0.25rem;">
-          New Eligible Coverage: ${prodName}
-        </div>
-        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.75rem;">
-          Tap to review your pre-approved proposal with $${savings}/yr multi-policy bundle savings.
-        </div>
-        <div style="background:var(--blue-primary); color:#FFFFFF; font-weight:700; font-size:0.76rem; text-align:center; padding:0.4rem; border-radius:var(--radius-sm); cursor:pointer;">
-          View Pre-Approved Offer
-        </div>
+  // Mobile App Push Preview
+  return `
+    <div style="background:var(--bg-darkest); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:1rem;">
+      <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+        <img src="/dubrovnik-castle-logo.jpg" style="width:24px; height:24px; border-radius:4px;" />
+        <span style="font-size:0.76rem; font-weight:700; color:var(--text-bright);">Magic Insurance Mobile Portal</span>
+        <span style="font-size:0.68rem; color:var(--text-dim); margin-left:auto;">Now</span>
       </div>
-    `;
-  }
+      <div style="font-size:0.84rem; font-weight:700; color:var(--text-bright); margin-bottom:0.25rem;">
+        New Eligible Coverage: ${prodName}
+      </div>
+      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.75rem;">
+        Tap to review your pre-approved proposal with $${savings}/yr multi-policy bundle savings.
+      </div>
+      <div style="background:var(--blue-primary); color:#FFFFFF; font-weight:700; font-size:0.76rem; text-align:center; padding:0.4rem; border-radius:var(--radius-sm); cursor:pointer;">
+        View Pre-Approved Offer
+      </div>
+    </div>
+  `;
 }
 
 // Render New Inbound Leads & Rate Quote Intake Page (for Insurance Employees)
@@ -1118,26 +522,25 @@ function renderLeadsView() {
   });
 
   const totalPipelineARR = state.leads.reduce((acc, l) => acc + (l.annualQuote || 0), 0);
-  const avgMonthlyQuote = Math.round(state.leads.reduce((acc, l) => acc + (l.monthlyQuote || 0), 0) / (state.leads.length || 1));
-  const highIntentCount = state.leads.filter(l => l.closingLikelihood >= 85).length;
+  const binderReadyCount = state.leads.filter(l => l.status === 'Binder Ready').length;
 
   return `
-    <div class="leads-page-container">
-      <!-- Pipeline KPI Metrics -->
+    <div class="leads-view-container">
+      <!-- Top Overview KPI Cards -->
       <div class="leads-kpi-row">
         <div class="kpi-card">
-          <div class="kpi-title">Inbound Inquiries Queue</div>
-          <div class="kpi-value">${state.leads.length} Leads</div>
-          <div class="kpi-trend">+4 new inquiries in last 3 hours</div>
+          <div class="kpi-title">Active Inbound Rate Inquiries</div>
+          <div class="kpi-value">${state.leads.length} Prospects</div>
+          <div class="kpi-trend">+18% inquiry volume this week</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-title">Average Car Insurance Quoted</div>
-          <div class="kpi-value">$${avgMonthlyQuote}/mo</div>
-          <div class="kpi-trend">Preferred rate tier benchmark</div>
+          <div class="kpi-title">Binder Ready for Conversion</div>
+          <div class="kpi-value">${binderReadyCount} Ready</div>
+          <div class="kpi-trend">Pre-approved for immediate binding</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-title">High Closing Probability</div>
-          <div class="kpi-value">${highIntentCount} (${Math.round((highIntentCount / state.leads.length) * 100)}%)</div>
+          <div class="kpi-title">Average Closing Probability</div>
+          <div class="kpi-value">86.2%</div>
           <div class="kpi-trend">Lead intent score over 85%</div>
         </div>
         <div class="kpi-card">
@@ -1219,20 +622,20 @@ function renderLeadsView() {
               <div style="display:flex; justify-content:space-between; font-size:0.68rem; color:var(--text-dim);">
                 <span>1 Year (New Driver)</span>
                 <span>5 Years (Standard)</span>
-                <span>15+ Years (Preferred Veteran)</span>
+                <span>10+ Years (Preferred Safe Driver)</span>
               </div>
             </div>
 
-            <!-- Class of Car -->
+            <!-- Car Class -->
             <div class="form-group-block">
-              <label class="form-label">Class of Car</label>
+              <label class="form-label">Car Class</label>
               <select class="form-select" id="calc-car-class">
-                <option value="sedan" ${calc.carClass === 'sedan' ? 'selected' : ''}>Midsize Sedan (Honda Accord, Toyota Camry)</option>
                 <option value="economy" ${calc.carClass === 'economy' ? 'selected' : ''}>Economy Hatchback (Civic, Corolla)</option>
-                <option value="suv" ${calc.carClass === 'suv' ? 'selected' : ''}>Compact / Crossover SUV (RAV4, CR-V)</option>
-                <option value="ev" ${calc.carClass === 'ev' ? 'selected' : ''}>Electric Vehicle / EV (Tesla Model 3/Y, Rivian)</option>
-                <option value="luxury" ${calc.carClass === 'luxury' ? 'selected' : ''}>Luxury / Sports Car (Porsche, Audi, BMW)</option>
-                <option value="truck" ${calc.carClass === 'truck' ? 'selected' : ''}>Full-Size Truck (Ford F-150, Silverado)</option>
+                <option value="sedan" ${calc.carClass === 'sedan' ? 'selected' : ''}>Midsize Sedan (Camry, Accord)</option>
+                <option value="suv" ${calc.carClass === 'suv' ? 'selected' : ''}>Compact/Midsize SUV (Forester, CR-V)</option>
+                <option value="ev" ${calc.carClass === 'ev' ? 'selected' : ''}>Electric Vehicle EV (Tesla Model Y/3, Mach-E)</option>
+                <option value="luxury" ${calc.carClass === 'luxury' ? 'selected' : ''}>Luxury / Performance (Porsche, BMW, Audi)</option>
+                <option value="truck" ${calc.carClass === 'truck' ? 'selected' : ''}>Full-size Truck (Ford F-150, Silverado)</option>
               </select>
             </div>
 
@@ -1352,9 +755,9 @@ function renderLeadsView() {
               </thead>
               <tbody>
                 ${filteredLeads.map(l => {
-    const statusClass = l.status === 'Binder Ready' ? 'binder-ready' :
-      l.status === 'Quote Sent' ? 'quote-sent' : 'follow-up';
-    return `
+                  const statusClass = l.status === 'Binder Ready' ? 'binder-ready' :
+                    l.status === 'Quote Sent' ? 'quote-sent' : 'follow-up';
+                  return `
                     <tr class="directory-table-row">
                       <td style="padding:0.85rem 0.85rem;">
                         <div style="font-weight:700; color:var(--text-bright);">${l.fullName}</div>
@@ -1388,7 +791,7 @@ function renderLeadsView() {
                       </td>
                     </tr>
                   `;
-  }).join('')}
+                }).join('')}
               </tbody>
             </table>
           </div>
@@ -1995,7 +1398,6 @@ function renderBindConvertView() {
   `;
 }
 
-
 // Render Growth & Retention Analytics View (No Emojis)
 function renderAnalyticsView() {
   return `
@@ -2047,35 +1449,28 @@ function renderAnalyticsView() {
             <div class="bar-item">
               <div class="bar-label-row">
                 <span class="bar-label-name">New Vehicle Delivery (Connected Auto)</span>
-                <span class="bar-label-val">62.8%</span>
-              </div>
-              <div class="bar-track"><div class="bar-fill" style="width: 62.8%;"></div></div>
-            </div>
-            <div class="bar-item">
-              <div class="bar-label-row">
-                <span class="bar-label-name">Rate Shock Defense (Loyalty Rate Shield)</span>
                 <span class="bar-label-val">84.1%</span>
               </div>
-              <div class="bar-track"><div class="bar-fill emerald" style="width: 84.1%;"></div></div>
+              <div class="bar-track"><div class="bar-fill" style="width: 84.1%;"></div></div>
             </div>
             <div class="bar-item">
               <div class="bar-label-row">
-                <span class="bar-label-name">Household Driver Milestones (Liability Shield)</span>
-                <span class="bar-label-val">59.5%</span>
+                <span class="bar-label-name">High Competitor Shopping Ping (Rate Shield)</span>
+                <span class="bar-label-val">91.3%</span>
               </div>
-              <div class="bar-track"><div class="bar-fill" style="width: 59.5%;"></div></div>
+              <div class="bar-track"><div class="bar-fill" style="width: 91.3%;"></div></div>
             </div>
           </div>
         </div>
 
         <div class="chart-card">
           <div class="chart-header">
-            <h3 class="chart-title">Traditional Reactive vs Proactive Agent Model</h3>
-            <p class="chart-subtitle">Business impact metrics comparing conventional insurer workflows to Magic Insurance</p>
+            <h3 class="chart-title">Strategic Value Creation</h3>
+            <p class="chart-subtitle">Direct financial impact comparing Magic Insurance proactive engine vs reactive carriers</p>
           </div>
-          <div style="display:flex; flex-direction:column; gap:0.9rem; font-size:0.82rem; margin-top:0.5rem;">
-            <div style="padding:0.75rem; background:rgba(244,63,94,0.08); border-left:3px solid var(--rose-danger); border-radius:var(--radius-sm);">
-              <div style="font-weight:700; color:var(--rose-danger); margin-bottom:0.2rem;">Legacy Reactive Insurer Model</div>
+          <div style="display:flex; flex-direction:column; gap:0.85rem; font-size:0.82rem; line-height:1.5;">
+            <div style="padding:0.75rem; background:rgba(239,68,68,0.06); border-left:3px solid var(--rose-danger); border-radius:var(--radius-sm);">
+              <div style="font-weight:700; color:var(--rose-danger); margin-bottom:0.2rem;">Traditional Reactive Carrier Model</div>
               <div style="color:var(--text-muted);">
                 Waits for annual renewal notice or customer cancellation call. Churn rate averages 15-22% annually. Cross-selling relies on unsolicited blanket cold-calls with less than 3% conversion.
               </div>
@@ -2093,659 +1488,82 @@ function renderAnalyticsView() {
   `;
 }
 
-// Rate calculation engine for formulated offer
-function getOfferRateCalculation(lead, config) {
-  if (!lead || !config) {
-    return {
-      monthly: 0,
-      annual: 0,
-      bundleSavings: 0,
-      closingLikelihood: 85,
-      essentialMonthly: 0,
-      recommendedMonthly: 0,
-      eliteMonthly: 0
-    };
-  }
-
-  const baseQuote = lead.monthlyQuote || 100;
-
-  // Calculate baseline monthly for each tier
-  const essentialBase = Math.round(baseQuote * 0.84);
-  const recommendedBase = baseQuote;
-  const eliteBase = Math.round(baseQuote * 1.30);
-
-  let activeBase = config.selectedTier === 'essential' ? essentialBase :
-                   config.selectedTier === 'elite' ? eliteBase :
-                   recommendedBase;
-
-  // Deductible adjustment
-  let deductibleDelta = 0;
-  if (config.deductible === 250) deductibleDelta = 12;
-  else if (config.deductible === 1000) deductibleDelta = -10;
-
-  // Liability adjustment
-  let liabilityDelta = 0;
-  if (config.liabilityLimit === 'standard') liabilityDelta = -6;
-  else if (config.liabilityLimit === 'maximum') liabilityDelta = 14;
-
-  // Addons adjustment
-  let addonsDelta = 0;
-  if (config.addons?.roadside) addonsDelta += 8;
-  if (config.addons?.rental) addonsDelta += 6;
-  if (config.addons?.glass) addonsDelta += 5;
-  if (config.addons?.oemParts) addonsDelta += 12;
-
-  let computedMonthly = Math.max(35, activeBase + deductibleDelta + liabilityDelta + addonsDelta);
-
-  // Agent discretionary discount
-  if (config.agentDiscountPercent > 0) {
-    computedMonthly = Math.round(computedMonthly * (1 - config.agentDiscountPercent / 100));
-  }
-
-  // Custom manual override if provided
-  if (config.customMonthlyOverride !== null && config.customMonthlyOverride !== undefined && !isNaN(config.customMonthlyOverride) && config.customMonthlyOverride > 0) {
-    computedMonthly = Math.round(Number(config.customMonthlyOverride));
-  }
-
-  const annual = Math.round(computedMonthly * 12 * 0.92); // 8% pay-in-full discount
-  const bundleSavings = Math.round(annual * 0.18);
-
-  // Dynamic closing likelihood
-  let closingLikelihood = lead.closingLikelihood || 88;
-  if (config.agentDiscountPercent >= 10) closingLikelihood = Math.min(99, closingLikelihood + 7);
-  else if (config.agentDiscountPercent >= 5) closingLikelihood = Math.min(97, closingLikelihood + 4);
-  if (config.selectedTier === 'essential') closingLikelihood = Math.min(96, closingLikelihood + 3);
-  if (config.selectedTier === 'elite' && config.agentDiscountPercent === 0) closingLikelihood = Math.max(74, closingLikelihood - 4);
-
-  return {
-    monthly: computedMonthly,
-    annual,
-    bundleSavings,
-    closingLikelihood,
-    essentialMonthly: essentialBase,
-    recommendedMonthly: recommendedBase,
-    eliteMonthly: eliteBase
-  };
-}
-
-function initiateBindAndConvert(leadId) {
-  const lead = state.leads.find(l => l.id === leadId);
-  if (!lead) return;
-
-  state.activeBindLeadId = leadId;
-  state.activeOfferConfig = {
-    leadId: lead.id,
-    selectedTier: 'recommended',
-    deductible: 500,
-    liabilityLimit: 'enhanced',
-    addons: {
-      roadside: true,
-      rental: false,
-      glass: true,
-      oemParts: lead.carClassKey === 'ev' || lead.carClassKey === 'luxury'
-    },
-    agentDiscountPercent: 0,
-    paymentFrequency: 'monthly',
-    customMonthlyOverride: null,
-    effectiveDate: new Date().toISOString().split('T')[0],
-    agentNotes: `Inbound inquiry for ${lead.carClass}. Underwriting rating tier: ${lead.tier}.`
-  };
-
-  state.currentView = 'bind-convert';
-  renderApp();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// Render Bind & Convert: Recommended Rates & Formulated Offer View
-function renderBindConvertView() {
-  const lead = state.leads.find(l => l.id === state.activeBindLeadId) || state.leads[0];
-  if (!lead) {
-    return `<div style="padding:2rem;">No active lead found. <button class="action-btn-primary" id="btn-back-to-leads">Back to Inbound Leads</button></div>`;
-  }
-
-  const config = state.activeOfferConfig || {
-    leadId: lead.id,
-    selectedTier: 'recommended',
-    deductible: 500,
-    liabilityLimit: 'enhanced',
-    addons: { roadside: true, rental: false, glass: true, oemParts: false },
-    agentDiscountPercent: 0,
-    paymentFrequency: 'monthly',
-    customMonthlyOverride: null,
-    effectiveDate: new Date().toISOString().split('T')[0]
-  };
-
-  const rates = getOfferRateCalculation(lead, config);
-  const initials = lead.fullName.split(' ').map(n => n[0]).join('').slice(0, 2);
-
-  const tierMeta = {
-    essential: {
-      name: 'Essential Standard',
-      desc: 'State compliance and core liability with standard roadside assistance.',
-      deductible: '$1,000 Deductible',
-      liability: '$50k / $100k / $50k Liability',
-      features: ['State Minimum & Bodily Injury ($50k/$100k)', 'Collision & Comprehensive ($1k Deductible)', 'Standard Emergency Roadside Dispatch']
-    },
-    recommended: {
-      name: 'Magic Preferred (AI Recommended)',
-      desc: 'Optimal protection tailored for driving record, vehicle class, and high retention.',
-      deductible: '$500 Deductible (Recommended)',
-      liability: '$100k / $300k / $100k Enhanced Liability',
-      features: ['Enhanced Bodily Injury & Property ($100k/$300k)', 'Collision & Comprehensive ($500 Deductible)', '24/7 National Towing & Roadside Assistance', 'Zero-Deductible Full Windshield & Glass', 'Multi-Policy Bundle Savings Credit']
-    },
-    elite: {
-      name: 'Comprehensive Elite',
-      desc: 'Maximum coverage with OEM replacement parts, rental reimbursement, and gap protection.',
-      deductible: '$250 Deductible',
-      liability: '$250k / $500k / $250k Umbrella Ready',
-      features: ['Maximum Umbrella-Ready Liability ($250k/$500k)', 'Low $250 Collision & Comprehensive Deductible', 'OEM Genuine Parts Replacement Guarantee', 'Rental Car Reimbursement ($45/day)', 'Full Glass & Comprehensive Gap Protection']
-    }
-  };
-
-  const currentTierInfo = tierMeta[config.selectedTier] || tierMeta.recommended;
-
-  const liabilityLabels = {
-    standard: '$50,000 / $100,000 / $50,000',
-    enhanced: '$100,000 / $300,000 / $100,000',
-    maximum: '$250,000 / $500,000 / $250,000'
-  };
-
-  return `
-    <div class="bind-convert-view">
-      <!-- Breadcrumb and Top Navigation -->
-      <div class="bind-header-bar">
-        <div class="bind-breadcrumb">
-          <button class="bind-breadcrumb-btn" id="btn-back-to-leads">
-            &larr; Back to Inbound Leads Pipeline
-          </button>
-          <span>/</span>
-          <span style="color:var(--text-bright); font-weight:700;">Bind & Convert Offer Formulation</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:0.75rem;">
-          <span class="policy-status-pill" style="background:#E0F2FE; color:#0369A1; border-color:#BAE6FD;">
-            Binder Inception Engine
-          </span>
-          <span class="likelihood-badge-pill ${rates.closingLikelihood >= 88 ? 'very-high' : 'high'}">
-            ${rates.closingLikelihood}% Closing Likelihood
-          </span>
-        </div>
-      </div>
-
-      <!-- Applicant Overview Banner -->
-      <div class="bind-prospect-banner">
-        <div class="bind-prospect-profile">
-          <div class="bind-prospect-avatar">${initials}</div>
-          <div class="bind-prospect-details">
-            <h2>${lead.fullName}</h2>
-            <div class="bind-prospect-meta">
-              <span>${lead.email}</span>
-              <span>&bull;</span>
-              <span>${lead.phone}</span>
-              <span>&bull;</span>
-              <span>${lead.location}</span>
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-          <span class="bind-prospect-pill">Vehicle: <strong>${lead.carClass}</strong></span>
-          <span class="bind-prospect-pill">Experience: <strong>${lead.drivingExperience} yrs</strong></span>
-          <span class="bind-prospect-pill">Record: <strong>${lead.record}</strong></span>
-          <span class="bind-prospect-pill">Mileage: <strong>${lead.annualMileage}</strong></span>
-          <span class="bind-prospect-pill">Rating Tier: <strong>${lead.tier}</strong></span>
-        </div>
-      </div>
-
-      <!-- Main Layout Columns: Left = Recommended Rates & Adjustments, Right = Formulated Binder Offer -->
-      <div class="bind-layout-columns">
-        <div style="display:flex; flex-direction:column; gap:1.5rem;">
-          
-          <!-- Section 1: Recommended Rates for this Customer -->
-          <div class="glass-panel" style="padding:1.5rem;">
-            <div class="panel-header" style="margin-bottom:0.25rem;">
-              <div>
-                <h3 class="panel-title" style="font-size:1.1rem;">Recommended Rates for ${lead.fullName}</h3>
-                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">
-                  AI actuarial underwriting recommendations based on applicant's driving record, vehicle class, and risk tier.
-                </p>
-              </div>
-            </div>
-
-            <!-- Tier Cards Grid -->
-            <div class="tier-cards-grid">
-              <!-- Essential -->
-              <div class="tier-rate-card ${config.selectedTier === 'essential' ? 'selected' : ''}" data-select-tier="essential">
-                <div>
-                  <div class="tier-name">${tierMeta.essential.name}</div>
-                  <div class="tier-desc">${tierMeta.essential.desc}</div>
-                  <div class="tier-price-display">
-                    <span class="tier-price-val">$${rates.essentialMonthly}</span>
-                    <span class="tier-price-period">/mo</span>
-                  </div>
-                  <div class="tier-annual-sub">$${Math.round(rates.essentialMonthly * 12 * 0.92)}/yr (8% pay-in-full discount)</div>
-                  <ul class="tier-feature-list">
-                    ${tierMeta.essential.features.map(f => `
-                      <li class="tier-feature-item">
-                        <span class="tier-feature-bullet">&check;</span>
-                        <span>${f}</span>
-                      </li>
-                    `).join('')}
-                  </ul>
-                </div>
-                <button type="button" class="tier-select-btn">
-                  ${config.selectedTier === 'essential' ? 'Selected Package' : 'Select Package'}
-                </button>
-              </div>
-
-              <!-- Recommended Magic Preferred -->
-              <div class="tier-rate-card recommended ${config.selectedTier === 'recommended' ? 'selected' : ''}" data-select-tier="recommended">
-                <span class="tier-recommended-ribbon">AI Recommended</span>
-                <div>
-                  <div class="tier-name">${tierMeta.recommended.name}</div>
-                  <div class="tier-desc">${tierMeta.recommended.desc}</div>
-                  <div class="tier-price-display">
-                    <span class="tier-price-val" style="color:var(--blue-primary);">$${rates.recommendedMonthly}</span>
-                    <span class="tier-price-period">/mo</span>
-                  </div>
-                  <div class="tier-annual-sub">$${lead.annualQuote}/yr (Includes bundle savings)</div>
-                  <ul class="tier-feature-list">
-                    ${tierMeta.recommended.features.map(f => `
-                      <li class="tier-feature-item">
-                        <span class="tier-feature-bullet" style="color:var(--emerald-success);">&check;</span>
-                        <span>${f}</span>
-                      </li>
-                    `).join('')}
-                  </ul>
-                </div>
-                <button type="button" class="tier-select-btn">
-                  ${config.selectedTier === 'recommended' ? 'Active Recommended Package' : 'Select Package'}
-                </button>
-              </div>
-
-              <!-- Elite -->
-              <div class="tier-rate-card ${config.selectedTier === 'elite' ? 'selected' : ''}" data-select-tier="elite">
-                <div>
-                  <div class="tier-name">${tierMeta.elite.name}</div>
-                  <div class="tier-desc">${tierMeta.elite.desc}</div>
-                  <div class="tier-price-display">
-                    <span class="tier-price-val">$${rates.eliteMonthly}</span>
-                    <span class="tier-price-period">/mo</span>
-                  </div>
-                  <div class="tier-annual-sub">$${Math.round(rates.eliteMonthly * 12 * 0.92)}/yr (Premium tier)</div>
-                  <ul class="tier-feature-list">
-                    ${tierMeta.elite.features.map(f => `
-                      <li class="tier-feature-item">
-                        <span class="tier-feature-bullet">&check;</span>
-                        <span>${f}</span>
-                      </li>
-                    `).join('')}
-                  </ul>
-                </div>
-                <button type="button" class="tier-select-btn">
-                  ${config.selectedTier === 'elite' ? 'Selected Package' : 'Select Package'}
-                </button>
-              </div>
-            </div>
-
-            <!-- Underwriting Actuarial Factors -->
-            <div class="underwriting-breakdown-box" style="margin-top:1.25rem;">
-              <div style="font-size:0.75rem; font-weight:700; color:var(--text-bright); text-transform:uppercase; letter-spacing:0.04em;">
-                Actuarial Underwriting Factors & Rate Justification
-              </div>
-              <div class="breakdown-factors-grid">
-                <div class="breakdown-factor-item">
-                  <span class="factor-label">Driving Record</span>
-                  <span class="factor-value">${lead.record.includes('Clean') ? 'Clean Record' : 'Standard'}</span>
-                  <span class="factor-credit">${lead.record.includes('Clean') ? '-12% Safe Driver Credit' : 'Base Rate'}</span>
-                </div>
-                <div class="breakdown-factor-item">
-                  <span class="factor-label">Driving Experience</span>
-                  <span class="factor-value">${lead.drivingExperience} Years</span>
-                  <span class="factor-credit">${lead.drivingExperience >= 5 ? '-8% Seasoned Credit' : 'Standard Tier'}</span>
-                </div>
-                <div class="breakdown-factor-item">
-                  <span class="factor-label">Vehicle Risk Class</span>
-                  <span class="factor-value">${lead.carClass.split('(')[0].trim()}</span>
-                  <span class="factor-credit" style="color:var(--blue-primary);">5-Star Safety Profile</span>
-                </div>
-                <div class="breakdown-factor-item">
-                  <span class="factor-label">Bundle Incentive</span>
-                  <span class="factor-value">Save $${lead.bundleSavings}/yr</span>
-                  <span class="factor-credit">Multi-Policy Discount</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Section 2: Option to Adjust the Offer -->
-          <div class="glass-panel" style="padding:1.5rem;" id="adjust-offer-section">
-            <div class="panel-header" style="margin-bottom:0.75rem;">
-              <div>
-                <h3 class="panel-title" style="font-size:1.1rem;">Adjust Offer Parameters</h3>
-                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">
-                  As an insurance agent, you can customize coverage limits, deductibles, endorsements, or apply discretionary discounts.
-                </p>
-              </div>
-              <button class="btn-bind-reset" id="btn-reset-offer" style="width:auto; padding:0.35rem 0.75rem;">
-                Reset to Recommended
-              </button>
-            </div>
-
-            <div class="adjust-offer-panel">
-              <!-- Deductible Selection -->
-              <div class="adjust-field-group">
-                <div class="adjust-field-header">
-                  <span>Comprehensive & Collision Deductible</span>
-                  <span style="font-size:0.7rem; color:var(--text-muted);">Current: $${config.deductible}</span>
-                </div>
-                <div class="adjust-options-pills">
-                  <div class="adjust-option-pill ${config.deductible === 250 ? 'active' : ''}" data-adjust-deductible="250">
-                    $250 (+$12/mo)
-                  </div>
-                  <div class="adjust-option-pill ${config.deductible === 500 ? 'active' : ''}" data-adjust-deductible="500">
-                    $500 (Recommended)
-                  </div>
-                  <div class="adjust-option-pill ${config.deductible === 1000 ? 'active' : ''}" data-adjust-deductible="1000">
-                    $1,000 (-$10/mo)
-                  </div>
-                </div>
-              </div>
-
-              <!-- Liability Limit Selection -->
-              <div class="adjust-field-group">
-                <div class="adjust-field-header">
-                  <span>Bodily Injury & Property Damage Limits</span>
-                  <span style="font-size:0.7rem; color:var(--text-muted);">${liabilityLabels[config.liabilityLimit]}</span>
-                </div>
-                <div class="adjust-options-pills">
-                  <div class="adjust-option-pill ${config.liabilityLimit === 'standard' ? 'active' : ''}" data-adjust-liability="standard">
-                    Standard ($50k/$100k, -$6/mo)
-                  </div>
-                  <div class="adjust-option-pill ${config.liabilityLimit === 'enhanced' ? 'active' : ''}" data-adjust-liability="enhanced">
-                    Enhanced ($100k/$300k, Recommended)
-                  </div>
-                  <div class="adjust-option-pill ${config.liabilityLimit === 'maximum' ? 'active' : ''}" data-adjust-liability="maximum">
-                    Umbrella-Ready ($250k/$500k, +$14/mo)
-                  </div>
-                </div>
-              </div>
-
-              <!-- Optional Add-ons Checkboxes -->
-              <div class="adjust-field-group">
-                <div class="adjust-field-header">
-                  <span>Coverage Endorsements & Add-ons</span>
-                  <span style="font-size:0.7rem; color:var(--text-muted);">Toggle to include or exclude</span>
-                </div>
-                <div class="addons-toggle-grid">
-                  <div class="addon-toggle-box ${config.addons.roadside ? 'active' : ''}" data-toggle-addon="roadside">
-                    <div class="addon-info">
-                      <span class="addon-name">24/7 Roadside Assistance</span>
-                      <span class="addon-cost">+$8.00 / mo</span>
-                    </div>
-                    <input type="checkbox" class="addon-checkbox" ${config.addons.roadside ? 'checked' : ''} />
-                  </div>
-
-                  <div class="addon-toggle-box ${config.addons.rental ? 'active' : ''}" data-toggle-addon="rental">
-                    <div class="addon-info">
-                      <span class="addon-name">Rental Car Reimbursement</span>
-                      <span class="addon-cost">+$6.00 / mo ($45/day)</span>
-                    </div>
-                    <input type="checkbox" class="addon-checkbox" ${config.addons.rental ? 'checked' : ''} />
-                  </div>
-
-                  <div class="addon-toggle-box ${config.addons.glass ? 'active' : ''}" data-toggle-addon="glass">
-                    <div class="addon-info">
-                      <span class="addon-name">Zero-Deductible Full Glass</span>
-                      <span class="addon-cost">+$5.00 / mo</span>
-                    </div>
-                    <input type="checkbox" class="addon-checkbox" ${config.addons.glass ? 'checked' : ''} />
-                  </div>
-
-                  <div class="addon-toggle-box ${config.addons.oemParts ? 'active' : ''}" data-toggle-addon="oemParts">
-                    <div class="addon-info">
-                      <span class="addon-name">OEM Genuine Replacement Parts</span>
-                      <span class="addon-cost">+$12.00 / mo</span>
-                    </div>
-                    <input type="checkbox" class="addon-checkbox" ${config.addons.oemParts ? 'checked' : ''} />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Agent Discretionary Discount & Custom Rate Override -->
-              <div class="form-row-dual">
-                <div class="adjust-field-group">
-                  <label class="form-label">
-                    <span>Agent Discretionary Discount</span>
-                    <span class="form-label-hint">${config.agentDiscountPercent}% Applied</span>
-                  </label>
-                  <select class="form-select" id="adjust-agent-discount">
-                    <option value="0" ${config.agentDiscountPercent === 0 ? 'selected' : ''}>0% - Standard Recommended Rate</option>
-                    <option value="5" ${config.agentDiscountPercent === 5 ? 'selected' : ''}>5% - Preferred Driver Courtesy Discount</option>
-                    <option value="10" ${config.agentDiscountPercent === 10 ? 'selected' : ''}>10% - Competitive Price Match Guarantee</option>
-                    <option value="15" ${config.agentDiscountPercent === 15 ? 'selected' : ''}>15% - Branch Manager Retention Override</option>
-                  </select>
-                </div>
-
-                <div class="adjust-field-group">
-                  <label class="form-label">
-                    <span>Direct Negotiated Monthly Override</span>
-                    <span class="form-label-hint">${config.customMonthlyOverride ? `Active: $${config.customMonthlyOverride}/mo` : 'Optional'}</span>
-                  </label>
-                  <div style="display:flex; gap:0.5rem;">
-                    <input 
-                      type="number" 
-                      class="form-input-text" 
-                      id="adjust-custom-rate-input" 
-                      placeholder="e.g. 95" 
-                      value="${config.customMonthlyOverride || ''}" 
-                      style="font-family:var(--font-mono);" 
-                    />
-                    <button class="action-btn-primary" id="btn-apply-custom-rate" style="padding:0.6rem 0.9rem; font-size:0.75rem;">
-                      Apply
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Internal Agent Notes -->
-              <div class="adjust-field-group">
-                <label class="form-label">Agent Underwriting & Binder Notes</label>
-                <input 
-                  type="text" 
-                  class="form-input-text" 
-                  id="adjust-agent-notes" 
-                  value="${config.agentNotes || ''}" 
-                  placeholder="Notes recorded on policy binding..." 
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Right Column: Formulated Offer & Binder Summary Card -->
-        <div>
-          <div class="formulated-binder-card">
-            <!-- Binder Header -->
-            <div class="binder-card-header">
-              <div class="binder-logo-title">
-                <div style="font-weight:800; font-size:0.95rem; letter-spacing:0.02em;">MAGIC INSURANCE CORE</div>
-                <div style="font-size:0.68rem; color:#94A3B8;">Official Digital Policy Binder & Offer Proposal</div>
-              </div>
-              <div class="binder-seal-badge">OFFER FORMULATED</div>
-            </div>
-
-            <!-- Binder Body -->
-            <div class="binder-card-body">
-              <!-- Proposal Pitch Narrative -->
-              <div class="binder-proposal-pitch">
-                <strong>Formulated Offer for ${lead.fullName}:</strong>
-                Comprehensive coverage on <em>${lead.carClass}</em> under the <strong>${currentTierInfo.name}</strong>. Includes guaranteed 30-day rate lock and zero-lapse digital binder inception.
-              </div>
-
-              <!-- Billing Plan Selector -->
-              <div style="display:flex; gap:0.5rem; background:var(--bg-darkest); padding:0.25rem; border-radius:var(--radius-sm); border:1px solid var(--border-subtle);">
-                <button 
-                  type="button" 
-                  class="adjust-option-pill ${config.paymentFrequency === 'monthly' ? 'active' : ''}" 
-                  data-payment-freq="monthly"
-                  style="padding:0.4rem;"
-                >
-                  Monthly Payment
-                </button>
-                <button 
-                  type="button" 
-                  class="adjust-option-pill ${config.paymentFrequency === 'annual' ? 'active' : ''}" 
-                  data-payment-freq="annual"
-                  style="padding:0.4rem;"
-                >
-                  Annual Pay-in-Full (Save 8%)
-                </button>
-              </div>
-
-              <!-- Itemized Binder Coverages -->
-              <div class="binder-items-list">
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Applicant:</span>
-                  <span class="binder-item-val">${lead.fullName}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Vehicle Insured:</span>
-                  <span class="binder-item-val">${lead.carClass}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Effective Date:</span>
-                  <span class="binder-item-val" style="font-family:var(--font-mono);">${config.effectiveDate} (Immediate)</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Policy Tier:</span>
-                  <span class="binder-item-val" style="color:var(--blue-primary);">${currentTierInfo.name}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Bodily Injury Limits:</span>
-                  <span class="binder-item-val">${liabilityLabels[config.liabilityLimit]}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Comp & Collision Deductible:</span>
-                  <span class="binder-item-val">$${config.deductible}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Active Endorsements:</span>
-                  <span class="binder-item-val" style="font-size:0.72rem; text-align:right;">
-                    ${Object.keys(config.addons).filter(k => config.addons[k]).join(', ') || 'Core Coverage Only'}
-                  </span>
-                </div>
-                ${config.agentDiscountPercent > 0 ? `
-                  <div class="binder-item-row" style="color:var(--emerald-success);">
-                    <span>Discretionary Agent Discount:</span>
-                    <span style="font-weight:700;">-${config.agentDiscountPercent}%</span>
-                  </div>
-                ` : ''}
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Multi-Policy Bundle Credit:</span>
-                  <span class="binder-item-val" style="color:var(--emerald-success); font-family:var(--font-mono);">Save $${rates.bundleSavings}/yr</span>
-                </div>
-              </div>
-
-              <!-- Highlighted Pricing Display -->
-              <div class="binder-pricing-highlight">
-                <div>
-                  <div style="font-size:0.7rem; text-transform:uppercase; font-weight:700; color:var(--text-dim); letter-spacing:0.04em;">
-                    ${config.paymentFrequency === 'monthly' ? 'Monthly Premium' : 'Annual Pay-in-Full'}
-                  </div>
-                  <div class="binder-monthly-total">
-                    $${config.paymentFrequency === 'monthly' ? rates.monthly : rates.annual}
-                    <span style="font-size:0.85rem; font-weight:500; color:var(--text-dim);">
-                      ${config.paymentFrequency === 'monthly' ? '/mo' : '/yr'}
-                    </span>
-                  </div>
-                </div>
-                <div style="text-align:right;">
-                  <div style="font-size:0.85rem; font-weight:700; color:var(--text-bright); font-family:var(--font-mono);">
-                    ${config.paymentFrequency === 'monthly' ? `$${rates.annual} / year` : `$${rates.monthly} / month equiv.`}
-                  </div>
-                  <div style="font-size:0.7rem; color:var(--emerald-success); font-weight:600; margin-top:0.2rem;">
-                    Down Payment Due: $${config.paymentFrequency === 'monthly' ? rates.monthly : rates.annual}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Action Buttons -->
-              <div class="binder-cta-container">
-                <button class="btn-bind-accept" id="btn-accept-bind-offer">
-                  <span>Accept Offer & Bind Policy</span>
-                  <span style="font-size:1.1rem;">&rarr;</span>
-                </button>
-                <div style="font-size:0.72rem; color:var(--text-muted); text-align:center; line-height:1.35;">
-                  Accepting instantly binds policy coverage, logs underwriting terms, and provisions active customer account.
-                </div>
-                <button class="btn-bind-reset" id="btn-cancel-bind" style="margin-top:0.25rem;">
-                  Cancel & Return to Leads
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-
-// Render Customer 360° Directory View (No Emojis)
+// Render Customer 360 Directory View
 function renderDirectoryView() {
+  const filtered = state.customers.filter(c => {
+    return c.name.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
+      c.location.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
+      c.occupation.toLowerCase().includes(state.searchQuery.toLowerCase());
+  });
+
   return `
-    <div class="glass-panel" style="padding:1.5rem;">
+    <div class="directory-view-container">
       <div class="panel-header">
         <div>
-          <h2 class="panel-title">Customer 360° Directory & Policy Inventory</h2>
-          <p style="font-size:0.76rem; color:var(--text-muted);">Comprehensive view of customer portfolios, churn liklihood, and active life event signals</p>
+          <h2 class="panel-title">Customer 360° Account Directory</h2>
+          <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">
+            Unified repository of all insured accounts, risk tiers, and multi-policy holding patterns.
+          </p>
         </div>
+        <span class="badge-counter">${filtered.length} Insured Households</span>
       </div>
 
       <div style="overflow-x:auto;">
-        <table style="width:100%; border-collapse:collapse; font-size:0.82rem; text-align:left;">
+        <table class="directory-table">
           <thead>
-            <tr style="border-bottom:1px solid var(--border-medium); color:var(--text-dim); text-transform:uppercase; font-size:0.7rem; letter-spacing:0.05em;">
-              <th style="padding:0.75rem 1rem;">Customer</th>
-              <th style="padding:0.75rem 1rem;">Location</th>
-              <th style="padding:0.75rem 1rem;">Active Policies</th>
-              <th style="padding:0.75rem 1rem;">Current Premium</th>
-              <th style="padding:0.75rem 1rem;">Estimated LTV</th>
-              <th style="padding:0.75rem 1rem;">Churn Risk</th>
-              <th style="padding:0.75rem 1rem;">Primary Signal</th>
-              <th style="padding:0.75rem 1rem; text-align:right;">Action</th>
+            <tr>
+              <th>Policyholder</th>
+              <th>Household / Location</th>
+              <th>Active Policies</th>
+              <th>Total Annual Premium</th>
+              <th>Estimated LTV</th>
+              <th>Churn Risk Tier</th>
+              <th>Next Best Action</th>
+              <th style="text-align:right;">Actions</th>
             </tr>
           </thead>
           <tbody>
-            ${state.customers.map(c => `
-              <tr class="directory-table-row">
-                <td style="padding:0.85rem 1rem; display:flex; align-items:center; gap:0.6rem;">
-                  <img src="${c.avatar}" style="width:32px; height:32px; border-radius:50%; object-fit:cover;" />
-                  <div>
-                    <div style="font-weight:700; color:var(--text-bright);">${c.name}</div>
-                    <div style="font-size:0.72rem; color:var(--text-dim);">${c.household}</div>
-                  </div>
-                </td>
-                <td style="padding:0.85rem 1rem; color:var(--text-muted);">${c.location}</td>
-                <td style="padding:0.85rem 1rem;">
-                  <span style="font-family:var(--font-mono); font-weight:700; color:var(--cyan-primary);">${c.activePolicies.length}</span>
-                  <span style="font-size:0.72rem; color:var(--text-dim);"> (${c.activePolicies.map(p => p.type.split(' ')[0]).join(', ')})</span>
-                </td>
-                <td style="padding:0.85rem 1rem; font-family:var(--font-mono); color:var(--text-bright);">$${c.totalAnnualPremium.toLocaleString()}/yr</td>
-                <td style="padding:0.85rem 1rem; font-family:var(--font-mono); color:var(--cyan-primary);">$${c.estimatedLTV.toLocaleString()}</td>
-                <td style="padding:0.85rem 1rem;">
-                  <span class="churn-tier-badge ${c.churnRiskTier}">${c.churnRiskScore}% Churn</span>
-                </td>
-                <td style="padding:0.85rem 1rem; color:var(--text-muted);">
-                  ${c.detectedSignals[0]?.title || 'No active signal'}
-                </td>
-                <td style="padding:0.85rem 1rem; text-align:right;">
-                  <button class="nav-tab-btn active" style="font-size:0.76rem; padding:0.35rem 0.75rem;" data-select-cust="${c.id}">
-                    View Profile
-                  </button>
-                </td>
-              </tr>
-            `).join('')}
+            ${filtered.map(c => {
+              const evalData = state.agent.evaluateCustomer(c);
+              const topProduct = evalData.nextBestAction?.recommendedProduct?.name || 'Bundle Optimized';
+              return `
+                <tr class="directory-table-row">
+                  <td style="padding:0.75rem 0.85rem;">
+                    <div style="display:flex; align-items:center; gap:0.6rem;">
+                      <img src="${c.avatar}" style="width:32px; height:32px; border-radius:50%; object-fit:cover;" />
+                      <div>
+                        <div style="font-weight:700; color:var(--text-bright);">${c.name}</div>
+                        <div style="font-size:0.7rem; color:var(--text-dim);">${c.occupation}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style="padding:0.75rem 0.85rem;">
+                    <div>${c.household}</div>
+                    <div style="font-size:0.7rem; color:var(--text-muted);">${c.location}</div>
+                  </td>
+                  <td style="padding:0.75rem 0.85rem;">
+                    <span class="policy-status-pill">${c.activePolicies.length} Active</span>
+                  </td>
+                  <td style="padding:0.75rem 0.85rem; font-family:var(--font-mono); font-weight:700;">
+                    $${c.totalAnnualPremium.toLocaleString()}/yr
+                  </td>
+                  <td style="padding:0.75rem 0.85rem; font-family:var(--font-mono); color:var(--cyan-primary); font-weight:700;">
+                    $${c.estimatedLTV.toLocaleString()}
+                  </td>
+                  <td style="padding:0.75rem 0.85rem;">
+                    <span class="churn-tier-badge ${c.churnRiskTier}">${c.churnRiskScore}% Risk</span>
+                  </td>
+                  <td style="padding:0.75rem 0.85rem;">
+                    <span style="font-size:0.75rem; font-weight:600; color:var(--text-main);">${topProduct}</span>
+                  </td>
+                  <td style="padding:0.75rem 0.85rem; text-align:right;">
+                    <button class="nav-tab-btn active" style="font-size:0.75rem; padding:0.35rem 0.75rem;" data-select-cust="${c.id}">
+                      View Profile
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
           </tbody>
         </table>
       </div>
@@ -2753,607 +1571,9 @@ function renderDirectoryView() {
   `;
 }
 
-// Rate calculation engine for formulated offer
-function getOfferRateCalculation(lead, config) {
-  if (!lead || !config) {
-    return {
-      monthly: 0,
-      annual: 0,
-      bundleSavings: 0,
-      closingLikelihood: 85,
-      essentialMonthly: 0,
-      recommendedMonthly: 0,
-      eliteMonthly: 0
-    };
-  }
-
-  const baseQuote = lead.monthlyQuote || 100;
-
-  // Calculate baseline monthly for each tier
-  const essentialBase = Math.round(baseQuote * 0.84);
-  const recommendedBase = baseQuote;
-  const eliteBase = Math.round(baseQuote * 1.30);
-
-  let activeBase = config.selectedTier === 'essential' ? essentialBase :
-                   config.selectedTier === 'elite' ? eliteBase :
-                   recommendedBase;
-
-  // Deductible adjustment
-  let deductibleDelta = 0;
-  if (config.deductible === 250) deductibleDelta = 12;
-  else if (config.deductible === 1000) deductibleDelta = -10;
-
-  // Liability adjustment
-  let liabilityDelta = 0;
-  if (config.liabilityLimit === 'standard') liabilityDelta = -6;
-  else if (config.liabilityLimit === 'maximum') liabilityDelta = 14;
-
-  // Addons adjustment
-  let addonsDelta = 0;
-  if (config.addons?.roadside) addonsDelta += 8;
-  if (config.addons?.rental) addonsDelta += 6;
-  if (config.addons?.glass) addonsDelta += 5;
-  if (config.addons?.oemParts) addonsDelta += 12;
-
-  let computedMonthly = Math.max(35, activeBase + deductibleDelta + liabilityDelta + addonsDelta);
-
-  // Agent discretionary discount
-  if (config.agentDiscountPercent > 0) {
-    computedMonthly = Math.round(computedMonthly * (1 - config.agentDiscountPercent / 100));
-  }
-
-  // Custom manual override if provided
-  if (config.customMonthlyOverride !== null && config.customMonthlyOverride !== undefined && !isNaN(config.customMonthlyOverride) && config.customMonthlyOverride > 0) {
-    computedMonthly = Math.round(Number(config.customMonthlyOverride));
-  }
-
-  const annual = Math.round(computedMonthly * 12 * 0.92); // 8% pay-in-full discount
-  const bundleSavings = Math.round(annual * 0.18);
-
-  // Dynamic closing likelihood
-  let closingLikelihood = lead.closingLikelihood || 88;
-  if (config.agentDiscountPercent >= 10) closingLikelihood = Math.min(99, closingLikelihood + 7);
-  else if (config.agentDiscountPercent >= 5) closingLikelihood = Math.min(97, closingLikelihood + 4);
-  if (config.selectedTier === 'essential') closingLikelihood = Math.min(96, closingLikelihood + 3);
-  if (config.selectedTier === 'elite' && config.agentDiscountPercent === 0) closingLikelihood = Math.max(74, closingLikelihood - 4);
-
-  return {
-    monthly: computedMonthly,
-    annual,
-    bundleSavings,
-    closingLikelihood,
-    essentialMonthly: essentialBase,
-    recommendedMonthly: recommendedBase,
-    eliteMonthly: eliteBase
-  };
-}
-
-function initiateBindAndConvert(leadId) {
-  const lead = state.leads.find(l => l.id === leadId);
-  if (!lead) return;
-
-  state.activeBindLeadId = leadId;
-  state.activeOfferConfig = {
-    leadId: lead.id,
-    selectedTier: 'recommended',
-    deductible: 500,
-    liabilityLimit: 'enhanced',
-    addons: {
-      roadside: true,
-      rental: false,
-      glass: true,
-      oemParts: lead.carClassKey === 'ev' || lead.carClassKey === 'luxury'
-    },
-    agentDiscountPercent: 0,
-    paymentFrequency: 'monthly',
-    customMonthlyOverride: null,
-    effectiveDate: new Date().toISOString().split('T')[0],
-    agentNotes: `Inbound inquiry for ${lead.carClass}. Underwriting rating tier: ${lead.tier}.`
-  };
-
-  state.currentView = 'bind-convert';
-  renderApp();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// Render Bind & Convert: Recommended Rates & Formulated Offer View
-function renderBindConvertView() {
-  const lead = state.leads.find(l => l.id === state.activeBindLeadId) || state.leads[0];
-  if (!lead) {
-    return `<div style="padding:2rem;">No active lead found. <button class="action-btn-primary" id="btn-back-to-leads">Back to Inbound Leads</button></div>`;
-  }
-
-  const config = state.activeOfferConfig || {
-    leadId: lead.id,
-    selectedTier: 'recommended',
-    deductible: 500,
-    liabilityLimit: 'enhanced',
-    addons: { roadside: true, rental: false, glass: true, oemParts: false },
-    agentDiscountPercent: 0,
-    paymentFrequency: 'monthly',
-    customMonthlyOverride: null,
-    effectiveDate: new Date().toISOString().split('T')[0]
-  };
-
-  const rates = getOfferRateCalculation(lead, config);
-  const initials = lead.fullName.split(' ').map(n => n[0]).join('').slice(0, 2);
-
-  const tierMeta = {
-    essential: {
-      name: 'Essential Standard',
-      desc: 'State compliance and core liability with standard roadside assistance.',
-      deductible: '$1,000 Deductible',
-      liability: '$50k / $100k / $50k Liability',
-      features: ['State Minimum & Bodily Injury ($50k/$100k)', 'Collision & Comprehensive ($1k Deductible)', 'Standard Emergency Roadside Dispatch']
-    },
-    recommended: {
-      name: 'Magic Preferred (AI Recommended)',
-      desc: 'Optimal protection tailored for driving record, vehicle class, and high retention.',
-      deductible: '$500 Deductible (Recommended)',
-      liability: '$100k / $300k / $100k Enhanced Liability',
-      features: ['Enhanced Bodily Injury & Property ($100k/$300k)', 'Collision & Comprehensive ($500 Deductible)', '24/7 National Towing & Roadside Assistance', 'Zero-Deductible Full Windshield & Glass', 'Multi-Policy Bundle Savings Credit']
-    },
-    elite: {
-      name: 'Comprehensive Elite',
-      desc: 'Maximum coverage with OEM replacement parts, rental reimbursement, and gap protection.',
-      deductible: '$250 Deductible',
-      liability: '$250k / $500k / $250k Umbrella Ready',
-      features: ['Maximum Umbrella-Ready Liability ($250k/$500k)', 'Low $250 Collision & Comprehensive Deductible', 'OEM Genuine Parts Replacement Guarantee', 'Rental Car Reimbursement ($45/day)', 'Full Glass & Comprehensive Gap Protection']
-    }
-  };
-
-  const currentTierInfo = tierMeta[config.selectedTier] || tierMeta.recommended;
-
-  const liabilityLabels = {
-    standard: '$50,000 / $100,000 / $50,000',
-    enhanced: '$100,000 / $300,000 / $100,000',
-    maximum: '$250,000 / $500,000 / $250,000'
-  };
-
-  return `
-    <div class="bind-convert-view">
-      <!-- Breadcrumb and Top Navigation -->
-      <div class="bind-header-bar">
-        <div class="bind-breadcrumb">
-          <button class="bind-breadcrumb-btn" id="btn-back-to-leads">
-            &larr; Back to Inbound Leads Pipeline
-          </button>
-          <span>/</span>
-          <span style="color:var(--text-bright); font-weight:700;">Bind & Convert Offer Formulation</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:0.75rem;">
-          <span class="policy-status-pill" style="background:#E0F2FE; color:#0369A1; border-color:#BAE6FD;">
-            Binder Inception Engine
-          </span>
-          <span class="likelihood-badge-pill ${rates.closingLikelihood >= 88 ? 'very-high' : 'high'}">
-            ${rates.closingLikelihood}% Closing Likelihood
-          </span>
-        </div>
-      </div>
-
-      <!-- Applicant Overview Banner -->
-      <div class="bind-prospect-banner">
-        <div class="bind-prospect-profile">
-          <div class="bind-prospect-avatar">${initials}</div>
-          <div class="bind-prospect-details">
-            <h2>${lead.fullName}</h2>
-            <div class="bind-prospect-meta">
-              <span>${lead.email}</span>
-              <span>&bull;</span>
-              <span>${lead.phone}</span>
-              <span>&bull;</span>
-              <span>${lead.location}</span>
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-          <span class="bind-prospect-pill">Vehicle: <strong>${lead.carClass}</strong></span>
-          <span class="bind-prospect-pill">Experience: <strong>${lead.drivingExperience} yrs</strong></span>
-          <span class="bind-prospect-pill">Record: <strong>${lead.record}</strong></span>
-          <span class="bind-prospect-pill">Mileage: <strong>${lead.annualMileage}</strong></span>
-          <span class="bind-prospect-pill">Rating Tier: <strong>${lead.tier}</strong></span>
-        </div>
-      </div>
-
-      <!-- Main Layout Columns: Left = Recommended Rates & Adjustments, Right = Formulated Binder Offer -->
-      <div class="bind-layout-columns">
-        <div style="display:flex; flex-direction:column; gap:1.5rem;">
-          
-          <!-- Section 1: Recommended Rates for this Customer -->
-          <div class="glass-panel" style="padding:1.5rem;">
-            <div class="panel-header" style="margin-bottom:0.25rem;">
-              <div>
-                <h3 class="panel-title" style="font-size:1.1rem;">Recommended Rates for ${lead.fullName}</h3>
-                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">
-                  AI actuarial underwriting recommendations based on applicant's driving record, vehicle class, and risk tier.
-                </p>
-              </div>
-            </div>
-
-            <!-- Tier Cards Grid -->
-            <div class="tier-cards-grid">
-              <!-- Essential -->
-              <div class="tier-rate-card ${config.selectedTier === 'essential' ? 'selected' : ''}" data-select-tier="essential">
-                <div>
-                  <div class="tier-name">${tierMeta.essential.name}</div>
-                  <div class="tier-desc">${tierMeta.essential.desc}</div>
-                  <div class="tier-price-display">
-                    <span class="tier-price-val">$${rates.essentialMonthly}</span>
-                    <span class="tier-price-period">/mo</span>
-                  </div>
-                  <div class="tier-annual-sub">$${Math.round(rates.essentialMonthly * 12 * 0.92)}/yr (8% pay-in-full discount)</div>
-                  <ul class="tier-feature-list">
-                    ${tierMeta.essential.features.map(f => `
-                      <li class="tier-feature-item">
-                        <span class="tier-feature-bullet">&check;</span>
-                        <span>${f}</span>
-                      </li>
-                    `).join('')}
-                  </ul>
-                </div>
-                <button type="button" class="tier-select-btn">
-                  ${config.selectedTier === 'essential' ? 'Selected Package' : 'Select Package'}
-                </button>
-              </div>
-
-              <!-- Recommended Magic Preferred -->
-              <div class="tier-rate-card recommended ${config.selectedTier === 'recommended' ? 'selected' : ''}" data-select-tier="recommended">
-                <span class="tier-recommended-ribbon">AI Recommended</span>
-                <div>
-                  <div class="tier-name">${tierMeta.recommended.name}</div>
-                  <div class="tier-desc">${tierMeta.recommended.desc}</div>
-                  <div class="tier-price-display">
-                    <span class="tier-price-val" style="color:var(--blue-primary);">$${rates.recommendedMonthly}</span>
-                    <span class="tier-price-period">/mo</span>
-                  </div>
-                  <div class="tier-annual-sub">$${lead.annualQuote}/yr (Includes bundle savings)</div>
-                  <ul class="tier-feature-list">
-                    ${tierMeta.recommended.features.map(f => `
-                      <li class="tier-feature-item">
-                        <span class="tier-feature-bullet" style="color:var(--emerald-success);">&check;</span>
-                        <span>${f}</span>
-                      </li>
-                    `).join('')}
-                  </ul>
-                </div>
-                <button type="button" class="tier-select-btn">
-                  ${config.selectedTier === 'recommended' ? 'Active Recommended Package' : 'Select Package'}
-                </button>
-              </div>
-
-              <!-- Elite -->
-              <div class="tier-rate-card ${config.selectedTier === 'elite' ? 'selected' : ''}" data-select-tier="elite">
-                <div>
-                  <div class="tier-name">${tierMeta.elite.name}</div>
-                  <div class="tier-desc">${tierMeta.elite.desc}</div>
-                  <div class="tier-price-display">
-                    <span class="tier-price-val">$${rates.eliteMonthly}</span>
-                    <span class="tier-price-period">/mo</span>
-                  </div>
-                  <div class="tier-annual-sub">$${Math.round(rates.eliteMonthly * 12 * 0.92)}/yr (Premium tier)</div>
-                  <ul class="tier-feature-list">
-                    ${tierMeta.elite.features.map(f => `
-                      <li class="tier-feature-item">
-                        <span class="tier-feature-bullet">&check;</span>
-                        <span>${f}</span>
-                      </li>
-                    `).join('')}
-                  </ul>
-                </div>
-                <button type="button" class="tier-select-btn">
-                  ${config.selectedTier === 'elite' ? 'Selected Package' : 'Select Package'}
-                </button>
-              </div>
-            </div>
-
-            <!-- Underwriting Actuarial Factors -->
-            <div class="underwriting-breakdown-box" style="margin-top:1.25rem;">
-              <div style="font-size:0.75rem; font-weight:700; color:var(--text-bright); text-transform:uppercase; letter-spacing:0.04em;">
-                Actuarial Underwriting Factors & Rate Justification
-              </div>
-              <div class="breakdown-factors-grid">
-                <div class="breakdown-factor-item">
-                  <span class="factor-label">Driving Record</span>
-                  <span class="factor-value">${lead.record.includes('Clean') ? 'Clean Record' : 'Standard'}</span>
-                  <span class="factor-credit">${lead.record.includes('Clean') ? '-12% Safe Driver Credit' : 'Base Rate'}</span>
-                </div>
-                <div class="breakdown-factor-item">
-                  <span class="factor-label">Driving Experience</span>
-                  <span class="factor-value">${lead.drivingExperience} Years</span>
-                  <span class="factor-credit">${lead.drivingExperience >= 5 ? '-8% Seasoned Credit' : 'Standard Tier'}</span>
-                </div>
-                <div class="breakdown-factor-item">
-                  <span class="factor-label">Vehicle Risk Class</span>
-                  <span class="factor-value">${lead.carClass.split('(')[0].trim()}</span>
-                  <span class="factor-credit" style="color:var(--blue-primary);">5-Star Safety Profile</span>
-                </div>
-                <div class="breakdown-factor-item">
-                  <span class="factor-label">Bundle Incentive</span>
-                  <span class="factor-value">Save $${lead.bundleSavings}/yr</span>
-                  <span class="factor-credit">Multi-Policy Discount</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Section 2: Option to Adjust the Offer -->
-          <div class="glass-panel" style="padding:1.5rem;" id="adjust-offer-section">
-            <div class="panel-header" style="margin-bottom:0.75rem;">
-              <div>
-                <h3 class="panel-title" style="font-size:1.1rem;">Adjust Offer Parameters</h3>
-                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">
-                  As an insurance agent, you can customize coverage limits, deductibles, endorsements, or apply discretionary discounts.
-                </p>
-              </div>
-              <button class="btn-bind-reset" id="btn-reset-offer" style="width:auto; padding:0.35rem 0.75rem;">
-                Reset to Recommended
-              </button>
-            </div>
-
-            <div class="adjust-offer-panel">
-              <!-- Deductible Selection -->
-              <div class="adjust-field-group">
-                <div class="adjust-field-header">
-                  <span>Comprehensive & Collision Deductible</span>
-                  <span style="font-size:0.7rem; color:var(--text-muted);">Current: $${config.deductible}</span>
-                </div>
-                <div class="adjust-options-pills">
-                  <div class="adjust-option-pill ${config.deductible === 250 ? 'active' : ''}" data-adjust-deductible="250">
-                    $250 (+$12/mo)
-                  </div>
-                  <div class="adjust-option-pill ${config.deductible === 500 ? 'active' : ''}" data-adjust-deductible="500">
-                    $500 (Recommended)
-                  </div>
-                  <div class="adjust-option-pill ${config.deductible === 1000 ? 'active' : ''}" data-adjust-deductible="1000">
-                    $1,000 (-$10/mo)
-                  </div>
-                </div>
-              </div>
-
-              <!-- Liability Limit Selection -->
-              <div class="adjust-field-group">
-                <div class="adjust-field-header">
-                  <span>Bodily Injury & Property Damage Limits</span>
-                  <span style="font-size:0.7rem; color:var(--text-muted);">${liabilityLabels[config.liabilityLimit]}</span>
-                </div>
-                <div class="adjust-options-pills">
-                  <div class="adjust-option-pill ${config.liabilityLimit === 'standard' ? 'active' : ''}" data-adjust-liability="standard">
-                    Standard ($50k/$100k, -$6/mo)
-                  </div>
-                  <div class="adjust-option-pill ${config.liabilityLimit === 'enhanced' ? 'active' : ''}" data-adjust-liability="enhanced">
-                    Enhanced ($100k/$300k, Recommended)
-                  </div>
-                  <div class="adjust-option-pill ${config.liabilityLimit === 'maximum' ? 'active' : ''}" data-adjust-liability="maximum">
-                    Umbrella-Ready ($250k/$500k, +$14/mo)
-                  </div>
-                </div>
-              </div>
-
-              <!-- Optional Add-ons Checkboxes -->
-              <div class="adjust-field-group">
-                <div class="adjust-field-header">
-                  <span>Coverage Endorsements & Add-ons</span>
-                  <span style="font-size:0.7rem; color:var(--text-muted);">Toggle to include or exclude</span>
-                </div>
-                <div class="addons-toggle-grid">
-                  <div class="addon-toggle-box ${config.addons.roadside ? 'active' : ''}" data-toggle-addon="roadside">
-                    <div class="addon-info">
-                      <span class="addon-name">24/7 Roadside Assistance</span>
-                      <span class="addon-cost">+$8.00 / mo</span>
-                    </div>
-                    <input type="checkbox" class="addon-checkbox" ${config.addons.roadside ? 'checked' : ''} />
-                  </div>
-
-                  <div class="addon-toggle-box ${config.addons.rental ? 'active' : ''}" data-toggle-addon="rental">
-                    <div class="addon-info">
-                      <span class="addon-name">Rental Car Reimbursement</span>
-                      <span class="addon-cost">+$6.00 / mo ($45/day)</span>
-                    </div>
-                    <input type="checkbox" class="addon-checkbox" ${config.addons.rental ? 'checked' : ''} />
-                  </div>
-
-                  <div class="addon-toggle-box ${config.addons.glass ? 'active' : ''}" data-toggle-addon="glass">
-                    <div class="addon-info">
-                      <span class="addon-name">Zero-Deductible Full Glass</span>
-                      <span class="addon-cost">+$5.00 / mo</span>
-                    </div>
-                    <input type="checkbox" class="addon-checkbox" ${config.addons.glass ? 'checked' : ''} />
-                  </div>
-
-                  <div class="addon-toggle-box ${config.addons.oemParts ? 'active' : ''}" data-toggle-addon="oemParts">
-                    <div class="addon-info">
-                      <span class="addon-name">OEM Genuine Replacement Parts</span>
-                      <span class="addon-cost">+$12.00 / mo</span>
-                    </div>
-                    <input type="checkbox" class="addon-checkbox" ${config.addons.oemParts ? 'checked' : ''} />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Agent Discretionary Discount & Custom Rate Override -->
-              <div class="form-row-dual">
-                <div class="adjust-field-group">
-                  <label class="form-label">
-                    <span>Agent Discretionary Discount</span>
-                    <span class="form-label-hint">${config.agentDiscountPercent}% Applied</span>
-                  </label>
-                  <select class="form-select" id="adjust-agent-discount">
-                    <option value="0" ${config.agentDiscountPercent === 0 ? 'selected' : ''}>0% - Standard Recommended Rate</option>
-                    <option value="5" ${config.agentDiscountPercent === 5 ? 'selected' : ''}>5% - Preferred Driver Courtesy Discount</option>
-                    <option value="10" ${config.agentDiscountPercent === 10 ? 'selected' : ''}>10% - Competitive Price Match Guarantee</option>
-                    <option value="15" ${config.agentDiscountPercent === 15 ? 'selected' : ''}>15% - Branch Manager Retention Override</option>
-                  </select>
-                </div>
-
-                <div class="adjust-field-group">
-                  <label class="form-label">
-                    <span>Direct Negotiated Monthly Override</span>
-                    <span class="form-label-hint">${config.customMonthlyOverride ? `Active: $${config.customMonthlyOverride}/mo` : 'Optional'}</span>
-                  </label>
-                  <div style="display:flex; gap:0.5rem;">
-                    <input 
-                      type="number" 
-                      class="form-input-text" 
-                      id="adjust-custom-rate-input" 
-                      placeholder="e.g. 95" 
-                      value="${config.customMonthlyOverride || ''}" 
-                      style="font-family:var(--font-mono);" 
-                    />
-                    <button class="action-btn-primary" id="btn-apply-custom-rate" style="padding:0.6rem 0.9rem; font-size:0.75rem;">
-                      Apply
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Internal Agent Notes -->
-              <div class="adjust-field-group">
-                <label class="form-label">Agent Underwriting & Binder Notes</label>
-                <input 
-                  type="text" 
-                  class="form-input-text" 
-                  id="adjust-agent-notes" 
-                  value="${config.agentNotes || ''}" 
-                  placeholder="Notes recorded on policy binding..." 
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Right Column: Formulated Offer & Binder Summary Card -->
-        <div>
-          <div class="formulated-binder-card">
-            <!-- Binder Header -->
-            <div class="binder-card-header">
-              <div class="binder-logo-title">
-                <div style="font-weight:800; font-size:0.95rem; letter-spacing:0.02em;">MAGIC INSURANCE CORE</div>
-                <div style="font-size:0.68rem; color:#94A3B8;">Official Digital Policy Binder & Offer Proposal</div>
-              </div>
-              <div class="binder-seal-badge">OFFER FORMULATED</div>
-            </div>
-
-            <!-- Binder Body -->
-            <div class="binder-card-body">
-              <!-- Proposal Pitch Narrative -->
-              <div class="binder-proposal-pitch">
-                <strong>Formulated Offer for ${lead.fullName}:</strong>
-                Comprehensive coverage on <em>${lead.carClass}</em> under the <strong>${currentTierInfo.name}</strong>. Includes guaranteed 30-day rate lock and zero-lapse digital binder inception.
-              </div>
-
-              <!-- Billing Plan Selector -->
-              <div style="display:flex; gap:0.5rem; background:var(--bg-darkest); padding:0.25rem; border-radius:var(--radius-sm); border:1px solid var(--border-subtle);">
-                <button 
-                  type="button" 
-                  class="adjust-option-pill ${config.paymentFrequency === 'monthly' ? 'active' : ''}" 
-                  data-payment-freq="monthly"
-                  style="padding:0.4rem;"
-                >
-                  Monthly Payment
-                </button>
-                <button 
-                  type="button" 
-                  class="adjust-option-pill ${config.paymentFrequency === 'annual' ? 'active' : ''}" 
-                  data-payment-freq="annual"
-                  style="padding:0.4rem;"
-                >
-                  Annual Pay-in-Full (Save 8%)
-                </button>
-              </div>
-
-              <!-- Itemized Binder Coverages -->
-              <div class="binder-items-list">
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Applicant:</span>
-                  <span class="binder-item-val">${lead.fullName}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Vehicle Insured:</span>
-                  <span class="binder-item-val">${lead.carClass}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Effective Date:</span>
-                  <span class="binder-item-val" style="font-family:var(--font-mono);">${config.effectiveDate} (Immediate)</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Policy Tier:</span>
-                  <span class="binder-item-val" style="color:var(--blue-primary);">${currentTierInfo.name}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Bodily Injury Limits:</span>
-                  <span class="binder-item-val">${liabilityLabels[config.liabilityLimit]}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Comp & Collision Deductible:</span>
-                  <span class="binder-item-val">$${config.deductible}</span>
-                </div>
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Active Endorsements:</span>
-                  <span class="binder-item-val" style="font-size:0.72rem; text-align:right;">
-                    ${Object.keys(config.addons).filter(k => config.addons[k]).join(', ') || 'Core Coverage Only'}
-                  </span>
-                </div>
-                ${config.agentDiscountPercent > 0 ? `
-                  <div class="binder-item-row" style="color:var(--emerald-success);">
-                    <span>Discretionary Agent Discount:</span>
-                    <span style="font-weight:700;">-${config.agentDiscountPercent}%</span>
-                  </div>
-                ` : ''}
-                <div class="binder-item-row">
-                  <span class="binder-item-label">Multi-Policy Bundle Credit:</span>
-                  <span class="binder-item-val" style="color:var(--emerald-success); font-family:var(--font-mono);">Save $${rates.bundleSavings}/yr</span>
-                </div>
-              </div>
-
-              <!-- Highlighted Pricing Display -->
-              <div class="binder-pricing-highlight">
-                <div>
-                  <div style="font-size:0.7rem; text-transform:uppercase; font-weight:700; color:var(--text-dim); letter-spacing:0.04em;">
-                    ${config.paymentFrequency === 'monthly' ? 'Monthly Premium' : 'Annual Pay-in-Full'}
-                  </div>
-                  <div class="binder-monthly-total">
-                    $${config.paymentFrequency === 'monthly' ? rates.monthly : rates.annual}
-                    <span style="font-size:0.85rem; font-weight:500; color:var(--text-dim);">
-                      ${config.paymentFrequency === 'monthly' ? '/mo' : '/yr'}
-                    </span>
-                  </div>
-                </div>
-                <div style="text-align:right;">
-                  <div style="font-size:0.85rem; font-weight:700; color:var(--text-bright); font-family:var(--font-mono);">
-                    ${config.paymentFrequency === 'monthly' ? `$${rates.annual} / year` : `$${rates.monthly} / month equiv.`}
-                  </div>
-                  <div style="font-size:0.7rem; color:var(--emerald-success); font-weight:600; margin-top:0.2rem;">
-                    Down Payment Due: $${config.paymentFrequency === 'monthly' ? rates.monthly : rates.annual}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Action Buttons -->
-              <div class="binder-cta-container">
-                <button class="btn-bind-accept" id="btn-accept-bind-offer">
-                  <span>Accept Offer & Bind Policy</span>
-                  <span style="font-size:1.1rem;">&rarr;</span>
-                </button>
-                <div style="font-size:0.72rem; color:var(--text-muted); text-align:center; line-height:1.35;">
-                  Accepting instantly binds policy coverage, logs underwriting terms, and provisions active customer account.
-                </div>
-                <button class="btn-bind-reset" id="btn-cancel-bind" style="margin-top:0.25rem;">
-                  Cancel & Return to Leads
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-
-// Event Listeners Wiring
+// Attach Event Listeners
 function attachEventListeners() {
-  // Navigation
+  // Navigation Tabs
   document.getElementById('nav-btn-command')?.addEventListener('click', () => {
     state.currentView = 'command';
     renderApp();
@@ -3508,9 +1728,7 @@ function attachEventListeners() {
     renderApp();
   });
 
-  // =========================================================================
   // Leads Page Calculator Events
-  // =========================================================================
   const expRange = document.getElementById('calc-exp-range');
   if (expRange) {
     expRange.addEventListener('input', (e) => {
@@ -3615,65 +1833,211 @@ function attachEventListeners() {
     renderApp();
   });
 
-  // Bind & Convert Lead to Customer Account
+  // Bind & Convert Lead Button -> Navigates to Offer Formulation & Recommended Rates Page
   document.querySelectorAll('[data-convert-lead]').forEach(btn => {
     btn.addEventListener('click', () => {
       const leadId = btn.getAttribute('data-convert-lead');
-      const lead = state.leads.find(l => l.id === leadId);
-      if (lead) {
-        // Create new customer profile
-        const newCustomer = {
-          id: `CUST-${Date.now().toString().slice(-4)}`,
-          name: lead.fullName,
-          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
-          age: 32,
-          household: 'Personal Account',
-          location: lead.location,
-          occupation: 'Professional',
-          tenureYears: 0.1,
-          totalAnnualPremium: lead.annualQuote,
-          estimatedLTV: lead.annualQuote * 8,
-          churnRiskScore: 18,
-          churnRiskTier: 'LOW',
-          churnDrivers: ['Newly bound account with preferred introductory rate'],
-          activePolicies: [
-            {
-              id: `POL-AUTO-${Date.now().toString().slice(-4)}`,
-              type: `Auto Shield (${lead.carClass})`,
-              annualPremium: lead.annualQuote,
-              status: 'Active',
-              renewalDate: '2027-10-26'
-            }
-          ],
-          detectedSignals: [
-            {
-              id: `SIG-NEW-${Date.now().toString().slice(-3)}`,
-              type: 'NEW_VEHICLE',
-              title: 'Active Policy Inception & Auto Coverage Bound',
-              timestamp: 'Just now',
-              source: 'Employee Inbound Intake Portal',
-              confidence: 1.0,
-              status: 'Active'
-            }
-          ],
-          digitalEngagement: {
-            appLoginsLast30Days: 1,
-            npsScore: 10,
-            sentiment: 'Enthusiastic new policyholder'
-          },
-          agentStatus: 'ACTIVE_POLICY',
-          lastContactDate: 'Today'
-        };
+      initiateBindAndConvert(leadId);
+    });
+  });
 
-        state.customers.unshift(newCustomer);
-        state.selectedCustomerId = newCustomer.id;
-        state.selectedProductId = null;
-        lead.status = 'Binder Ready';
-        showToast(`Lead ${lead.fullName} converted to active policyholder!`);
-        state.currentView = 'command';
+  // =========================================================================
+  // Bind & Convert View Event Handlers
+  // =========================================================================
+  document.getElementById('btn-back-to-leads')?.addEventListener('click', () => {
+    state.currentView = 'leads';
+    renderApp();
+  });
+  document.getElementById('btn-cancel-bind')?.addEventListener('click', () => {
+    state.currentView = 'leads';
+    renderApp();
+  });
+
+  // Tier Card Selection
+  document.querySelectorAll('[data-select-tier]').forEach(card => {
+    card.addEventListener('click', () => {
+      const tier = card.getAttribute('data-select-tier');
+      if (tier && state.activeOfferConfig) {
+        state.activeOfferConfig.selectedTier = tier;
+        if (tier === 'essential') {
+          state.activeOfferConfig.deductible = 1000;
+          state.activeOfferConfig.liabilityLimit = 'standard';
+          state.activeOfferConfig.addons.rental = false;
+          state.activeOfferConfig.addons.oemParts = false;
+        } else if (tier === 'recommended') {
+          state.activeOfferConfig.deductible = 500;
+          state.activeOfferConfig.liabilityLimit = 'enhanced';
+          state.activeOfferConfig.addons.roadside = true;
+          state.activeOfferConfig.addons.glass = true;
+        } else if (tier === 'elite') {
+          state.activeOfferConfig.deductible = 250;
+          state.activeOfferConfig.liabilityLimit = 'maximum';
+          state.activeOfferConfig.addons.roadside = true;
+          state.activeOfferConfig.addons.rental = true;
+          state.activeOfferConfig.addons.glass = true;
+          state.activeOfferConfig.addons.oemParts = true;
+        }
+        state.activeOfferConfig.customMonthlyOverride = null;
         renderApp();
       }
     });
+  });
+
+  // Deductible Adjustment
+  document.querySelectorAll('[data-adjust-deductible]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const val = Number(pill.getAttribute('data-adjust-deductible'));
+      if (val && state.activeOfferConfig) {
+        state.activeOfferConfig.deductible = val;
+        state.activeOfferConfig.customMonthlyOverride = null;
+        renderApp();
+      }
+    });
+  });
+
+  // Liability Limit Adjustment
+  document.querySelectorAll('[data-adjust-liability]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const val = pill.getAttribute('data-adjust-liability');
+      if (val && state.activeOfferConfig) {
+        state.activeOfferConfig.liabilityLimit = val;
+        state.activeOfferConfig.customMonthlyOverride = null;
+        renderApp();
+      }
+    });
+  });
+
+  // Addon Checkboxes Toggle
+  document.querySelectorAll('[data-toggle-addon]').forEach(box => {
+    box.addEventListener('click', (e) => {
+      // Avoid duplicate triggers if clicking directly on input
+      if (e.target.tagName.toLowerCase() === 'input') return;
+      const addon = box.getAttribute('data-toggle-addon');
+      if (addon && state.activeOfferConfig?.addons) {
+        state.activeOfferConfig.addons[addon] = !state.activeOfferConfig.addons[addon];
+        state.activeOfferConfig.customMonthlyOverride = null;
+        renderApp();
+      }
+    });
+  });
+  document.querySelectorAll('.addon-checkbox').forEach(chk => {
+    chk.addEventListener('change', (e) => {
+      const parent = e.target.closest('[data-toggle-addon]');
+      const addon = parent?.getAttribute('data-toggle-addon');
+      if (addon && state.activeOfferConfig?.addons) {
+        state.activeOfferConfig.addons[addon] = e.target.checked;
+        state.activeOfferConfig.customMonthlyOverride = null;
+        renderApp();
+      }
+    });
+  });
+
+  // Agent Discretionary Discount
+  const discountSelect = document.getElementById('adjust-agent-discount');
+  if (discountSelect) {
+    discountSelect.addEventListener('change', (e) => {
+      if (state.activeOfferConfig) {
+        state.activeOfferConfig.agentDiscountPercent = Number(e.target.value);
+        state.activeOfferConfig.customMonthlyOverride = null;
+        renderApp();
+      }
+    });
+  }
+
+  // Custom Monthly Rate Override
+  document.getElementById('btn-apply-custom-rate')?.addEventListener('click', () => {
+    const customRateVal = Number(document.getElementById('adjust-custom-rate-input')?.value);
+    if (!isNaN(customRateVal) && customRateVal > 0 && state.activeOfferConfig) {
+      state.activeOfferConfig.customMonthlyOverride = customRateVal;
+      showToast(`Custom rate override set to $${customRateVal}/mo`);
+      renderApp();
+    }
+  });
+
+  // Payment Frequency
+  document.querySelectorAll('[data-payment-freq]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const freq = btn.getAttribute('data-payment-freq');
+      if (freq && state.activeOfferConfig) {
+        state.activeOfferConfig.paymentFrequency = freq;
+        renderApp();
+      }
+    });
+  });
+
+  // Reset Offer to Recommended
+  document.getElementById('btn-reset-offer')?.addEventListener('click', () => {
+    if (state.activeBindLeadId) {
+      initiateBindAndConvert(state.activeBindLeadId);
+      showToast('Offer parameters reset to AI recommended rates');
+    }
+  });
+
+  // Accept Offer & Bind Policy (Continue)
+  document.getElementById('btn-accept-bind-offer')?.addEventListener('click', () => {
+    const lead = state.leads.find(l => l.id === state.activeBindLeadId) || state.leads[0];
+    if (!lead) return;
+
+    const config = state.activeOfferConfig;
+    const rates = getOfferRateCalculation(lead, config);
+    const policyId = `POL-AUTO-${Date.now().toString().slice(-4)}`;
+    const binderNumber = `BIND-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const newCustomer = {
+      id: `CUST-${Date.now().toString().slice(-4)}`,
+      name: lead.fullName,
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
+      age: 32,
+      household: 'Personal Account',
+      location: lead.location,
+      occupation: 'Professional',
+      tenureYears: 0.1,
+      totalAnnualPremium: rates.annual,
+      estimatedLTV: rates.annual * 8,
+      churnRiskScore: 16,
+      churnRiskTier: 'LOW',
+      churnDrivers: ['Newly bound account with formulated introductory rate'],
+      activePolicies: [
+        {
+          id: policyId,
+          type: `Auto Shield (${lead.carClass})`,
+          annualPremium: rates.annual,
+          monthlyPremium: rates.monthly,
+          binderNumber: binderNumber,
+          deductible: config.deductible,
+          liabilityLimit: config.liabilityLimit,
+          status: 'Active',
+          renewalDate: '2027-10-26'
+        }
+      ],
+      detectedSignals: [
+        {
+          id: `SIG-NEW-${Date.now().toString().slice(-3)}`,
+          type: 'NEW_VEHICLE',
+          title: `Active Policy Inception Bound (#${policyId})`,
+          timestamp: 'Just now',
+          source: 'Employee Inbound Intake & Offer Formulation',
+          confidence: 1.0,
+          status: 'Active'
+        }
+      ],
+      digitalEngagement: {
+        appLoginsLast30Days: 1,
+        npsScore: 10,
+        sentiment: 'Enthusiastic new policyholder - Accepted Formulated Offer'
+      },
+      agentStatus: 'ACTIVE_POLICY',
+      lastContactDate: 'Today'
+    };
+
+    state.customers.unshift(newCustomer);
+    state.selectedCustomerId = newCustomer.id;
+    state.selectedProductId = null;
+    lead.status = 'Binder Ready';
+
+    showToast(`Policy #${policyId} Bound! ${lead.fullName} converted with rate $${rates.monthly}/mo.`);
+    state.currentView = 'command';
+    renderApp();
   });
 }
 
